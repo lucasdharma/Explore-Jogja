@@ -124,6 +124,14 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .maplibregl-ctrl-attrib{background:rgba(241,237,230,.72) !important; font-size:10px !important}
 .maplibregl-ctrl-attrib a{color:var(--muted)}
 
+.map-status{position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; text-align:center; padding:32px;
+  background:var(--surface-2); transition:opacity .4s ease}
+.map-status.hidden{opacity:0; pointer-events:none}
+.map-status-text{font-family:var(--sans); font-size:13px; letter-spacing:.06em; color:var(--muted); max-width:320px}
+.map-status-text b{display:block; margin-bottom:10px; font-family:var(--serif); font-style:italic; font-weight:400; font-size:20px; letter-spacing:0; color:var(--ink)}
+.map-retry{margin-top:16px; display:inline-flex; font-family:var(--sans); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); background:none; border:1px solid var(--line-2); border-radius:999px; padding:10px 20px; cursor:pointer; min-height:44px; align-items:center}
+.map-retry:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
+
 .legend{position:absolute; z-index:5; left:26px; bottom:26px; background:var(--surface); border:1px solid var(--line);
   padding:11px 18px; display:flex; align-items:center; gap:11px; font-family:var(--sans); font-size:11px; font-weight:400; letter-spacing:.18em; text-transform:uppercase; color:var(--ink)}
 .legend .dot{width:6px; height:6px; border-radius:50%; background:var(--ink)}
@@ -260,6 +268,9 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 
   <div class="map-shell reveal">
     <div id="map"></div>
+    <div class="map-status" id="map-status" aria-live="polite">
+      <span class="map-status-text">Loading the map…</span>
+    </div>
     <div class="legend"><span class="dot"></span><span id="legend-text" aria-live="polite">Loading…</span></div>
   </div>
 
@@ -485,6 +496,14 @@ function popupHtml(p){
   </div>`;
 }
 
+const mapStatusEl=document.getElementById('map-status');
+function showMapStatus(html){ mapStatusEl.innerHTML=html; mapStatusEl.classList.remove('hidden'); }
+function hideMapStatus(){ mapStatusEl.classList.add('hidden'); }
+function showMapError(message){
+  legendEl.textContent='Map could not load';
+  showMapStatus(`<span class="map-status-text"><b>Map didn't load</b>${message}<br><button class="map-retry" type="button" onclick="location.reload()">Try again</button></span>`);
+}
+
 function loadMapLibre(cb){
   if(window.maplibregl) return cb();
   const link=document.createElement('link');
@@ -493,7 +512,7 @@ function loadMapLibre(cb){
   const script=document.createElement('script');
   script.src='https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
   script.onload=cb;
-  script.onerror=()=>{ legendEl.textContent='Map could not load'; };
+  script.onerror=()=>{ showMapError('Check your connection and try again.'); };
   document.head.appendChild(script);
 }
 
@@ -521,9 +540,14 @@ function initMap(){
   map.on('resize', sizePopup);           /* keep popup proportioned to the map — fires on window resize + fullscreen toggle */
   sizePopup();
   map.on('load', ()=>{
+    hideMapStatus();
     /* nudge the palette toward the warm guide look, where the style allows */
     try{ if(map.getLayer('water')) map.setPaintProperty('water','fill-color','#bfe2f0'); }catch(e){}
     renderMarkers(active);
+  });
+  map.on('error', e=>{
+    if(mapStatusEl.classList.contains('hidden')) return;   /* map already loaded fine once — ignore transient tile errors */
+    showMapError('The map style or tiles couldn\'t be reached on this connection.');
   });
 }
 
