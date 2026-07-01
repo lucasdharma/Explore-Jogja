@@ -87,14 +87,29 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .ex-head h2{margin-top:20px; font-size:clamp(34px,5.2vw,60px); font-weight:300}
 .ex-head p{margin:22px auto 0; max-width:560px}
 
-.tabs{display:flex; justify-content:center; flex-wrap:wrap; gap:44px; margin-bottom:44px}
-@media(max-width:760px){ .tabs{gap:26px; justify-content:flex-start; overflow-x:auto; scrollbar-width:none; padding-bottom:4px} .tabs::-webkit-scrollbar{display:none} }
-.tab{position:relative; background:none; border:0; padding:0 0 9px; cursor:pointer; white-space:nowrap;
-  font-family:var(--sans); font-weight:400; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); transition:color .35s}
-.tab::before{content:""; position:absolute; left:-8px; right:-8px; top:-14px; bottom:-4px}
-.tab .num{font-family:var(--serif); font-style:italic; font-size:13px; letter-spacing:0; margin-left:8px; opacity:.7}
-.tab::after{content:""; position:absolute; left:0; bottom:0; height:1px; width:100%; background:var(--ink); transform:scaleX(0); transform-origin:center; transition:transform .4s cubic-bezier(.4,0,.2,1)}
-.tab:hover{color:var(--ink)} .tab[aria-selected="true"]{color:var(--ink)} .tab[aria-selected="true"]::after{transform:scaleX(1); background:var(--tab-color, var(--ink))}
+/* seamless segmented category control — one pill, a sliding colour highlight, no gaps between segments */
+.tabs-wrap{display:flex; justify-content:center; margin-bottom:48px}
+.tabs{position:relative; display:inline-flex; align-items:center; gap:2px; max-width:100%;
+  padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:999px;
+  overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+@media(max-width:760px){ .tabs-wrap{justify-content:flex-start} .tabs{max-width:none} }
+.tab-highlight{position:absolute; top:6px; left:0; height:calc(100% - 12px); width:0; border-radius:999px;
+  background:var(--ink); box-shadow:0 8px 20px rgba(40,36,30,.28);
+  transition:transform .5s cubic-bezier(.65,0,.35,1), width .5s cubic-bezier(.65,0,.35,1), background .35s ease;
+  z-index:0; pointer-events:none}
+.tab{position:relative; z-index:1; display:inline-flex; align-items:center; gap:9px; background:none; border:0; border-radius:999px;
+  padding:12px 20px 12px 14px; cursor:pointer; white-space:nowrap;
+  font-family:var(--sans); font-weight:400; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); transition:color .35s}
+.tab-icon{width:17px; height:17px; flex:0 0 auto; display:inline-flex}
+.tab-icon svg{width:100%; height:100%; display:block}
+@keyframes iconSpinPop{0%{transform:rotate(0) scale(1)}45%{transform:rotate(210deg) scale(1.3)}75%{transform:rotate(345deg) scale(.92)}100%{transform:rotate(360deg) scale(1)}}
+.tab:hover .tab-icon{animation:iconSpinPop .6s cubic-bezier(.34,1.56,.64,1) 1}
+.tab[aria-selected="true"] .tab-icon{animation:iconSpinPop .6s cubic-bezier(.34,1.56,.64,1) 1}
+.tab .num{font-family:var(--serif); font-style:italic; font-size:12.5px; letter-spacing:0; opacity:.65}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--surface)}
+@media(max-width:760px){ .tab{padding:11px 16px 11px 12px; font-size:11px} }
 
 /* map — the highlight */
 .map-shell{position:relative; width:100%; height:76vh; min-height:520px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:var(--surface-2); box-shadow:0 40px 90px -40px rgba(40,36,30,.4); margin:8px 0 70px}
@@ -235,10 +250,12 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map — scroll to zoom, drag to move. Select any place to read why it earned its spot on our list.</p>
+      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or Ctrl/Cmd + scroll to zoom. Select any place to read why it earned its spot on our list.</p>
     </div>
 
-    <div class="tabs reveal" id="switch" role="tablist" aria-label="Choose a category"></div>
+    <div class="tabs-wrap reveal">
+      <div class="tabs" id="switch" role="tablist" aria-label="Choose a category"></div>
+    </div>
   </div>
 
   <div class="map-shell reveal">
@@ -375,11 +392,17 @@ const PLACES = [
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
 ];
 
+/* color = accent used on pins/card dots (light, decorative). active = darker shade used behind
+   the selected-tab label so cream text on it still clears 4.5:1 contrast. */
 const CATS = {
-  all:     { label:"All",      color:null },
-  coffee:  { label:"Coffee",   color:"#A67C52" },
-  slowbar: { label:"Slow Bar", color:"#6E4A5E" },
-  food:    { label:"Foodies",  color:"#5F7350" }
+  all:     { label:"All",      color:null,      active:null,
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M14.6 9.4 12.9 12.9 9.4 14.6 11.1 11.1Z"/></svg>` },
+  coffee:  { label:"Coffee",   color:"#A67C52", active:"#7A5A3D",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5Z"/><path d="M16 10.3h1.3a2.2 2.2 0 1 1 0 4.4H16"/><path d="M8.6 4.3c-.6.7-.6 1.3 0 2M12 4.3c-.6.7-.6 1.3 0 2"/></svg>` },
+  slowbar: { label:"Slow Bar", color:"#6E4A5E", active:"#5C3B49",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.2h15L12 13.6Z"/><path d="M12 13.6V19"/><path d="M8.3 19h7.4"/></svg>` },
+  food:    { label:"Foodies",  color:"#5F7350", active:"#4B5C3F",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.3 3.2v5.3M8.6 3.2v5.3M10.9 3.2v5.3M8.6 8.5V21"/><path d="M16.3 3.2c-1.7 1.8-1.7 4.6 0 6.4V21"/></svg>` }
 };
 const ORDER = ["all","coffee","slowbar","food"];
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
@@ -401,16 +424,29 @@ function makeDraggable(el){
 }
 makeDraggable(cardsEl);
 
+const highlightEl=document.createElement('span');
+highlightEl.className='tab-highlight'; highlightEl.setAttribute('aria-hidden','true');
+switchEl.appendChild(highlightEl);
+
 ORDER.forEach((key,i)=>{
   const c=CATS[key], n = key==='all' ? PLACES.length : PLACES.filter(p=>p.category===key).length;
   const btn=document.createElement('button');
   btn.className='tab'; btn.dataset.cat=key; btn.setAttribute('role','tab'); btn.setAttribute('aria-selected', i===0?'true':'false');
   btn.setAttribute('aria-controls','cards');
-  if(c.color) btn.style.setProperty('--tab-color', c.color);
-  btn.innerHTML=`${c.label}<span class="num">${n}</span>`;
+  btn.innerHTML=`<span class="tab-icon" aria-hidden="true">${c.icon}</span>${c.label}<span class="num">${n}</span>`;
   btn.addEventListener('click', ()=>selectCategory(key));
   switchEl.appendChild(btn);
 });
+
+function moveHighlight(){
+  const btn=switchEl.querySelector('.tab[aria-selected="true"]');
+  if(!btn) return;
+  const cat=CATS[btn.dataset.cat];
+  highlightEl.style.transform=`translateX(${btn.offsetLeft}px)`;
+  highlightEl.style.width=btn.offsetWidth+'px';
+  highlightEl.style.background=cat.active || 'var(--ink)';
+}
+requestAnimationFrame(moveHighlight);
 
 const placesFor = cat => PLACES.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
@@ -476,9 +512,8 @@ function initMap(){
     container:'map',
     style:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
     center:[110.395,-7.79], zoom:11.2,
-    attributionControl:true, cooperativeGestures:false, dragRotate:false, pitchWithRotate:false
+    attributionControl:true, cooperativeGestures:true, dragRotate:false, pitchWithRotate:false
   });
-  map.scrollZoom.enable();               /* scroll to zoom, as requested */
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
   map.addControl(new maplibregl.FullscreenControl({container:document.querySelector('.map-shell')}), 'top-right');
@@ -493,8 +528,10 @@ function initMap(){
 }
 
 function renderMarkers(cat){
-  markers.forEach(m=>m.marker.remove()); markers=[];
   const list=placesFor(cat);
+  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
+  if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
+  markers.forEach(m=>m.marker.remove()); markers=[];
   list.forEach(p=>{
     const el=document.createElement('div');
     el.className='pin';
@@ -513,7 +550,6 @@ function renderMarkers(cat){
     list.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
   }
-  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
   requestAnimationFrame(()=>markers.forEach(m=>m.el.classList.add('show')));
 }
 
@@ -532,16 +568,19 @@ function setActive(idx){
 function focusPlace(idx, fromCard){
   setActive(idx);
   const p=PLACES[idx];
-  map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
-  if(popup) popup.remove();
-  popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'292px', offset:20})
-    .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
+  ensureMap(()=>{
+    map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
+    if(popup) popup.remove();
+    popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'292px', offset:20})
+      .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
+  });
   if(!fromCard) cardFor(idx)?.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
 }
 function selectCategory(cat){
   if(cat===active) return;
   active=cat;
   [...switchEl.querySelectorAll('.tab')].forEach(b=>b.setAttribute('aria-selected', b.dataset.cat===cat?'true':'false'));
+  moveHighlight();
   railTitle.textContent=CATS[cat].label;
   if(popup) popup.remove();
   cardsEl.style.opacity=0;
@@ -555,13 +594,21 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
 const nav=document.getElementById('nav');
 addEventListener('scroll', ()=>{ nav.classList.toggle('solid', window.scrollY > window.innerHeight*0.72); }, {passive:true});
-let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>map&&map.resize(),200); }
+let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>{ map&&map.resize(); moveHighlight(); },200); }
 addEventListener('resize', reflow); addEventListener('orientationchange', reflow);
 
+let mapLoadingStarted=false, mapReadyCallbacks=[];
+function ensureMap(cb){
+  if(map){ cb(); return; }
+  mapReadyCallbacks.push(cb);
+  if(mapLoadingStarted) return;
+  mapLoadingStarted=true;
+  mapObserver.disconnect();
+  loadMapLibre(()=>{ initMap(); mapReadyCallbacks.forEach(fn=>fn()); mapReadyCallbacks=[]; });
+}
+
 const mapObserver=new IntersectionObserver(entries=>{
-  entries.forEach(entry=>{
-    if(entry.isIntersecting){ loadMapLibre(initMap); mapObserver.disconnect(); }
-  });
+  entries.forEach(entry=>{ if(entry.isIntersecting) ensureMap(()=>{}); });
 },{rootMargin:'600px 0px'});
 
 addEventListener('load', ()=>{
