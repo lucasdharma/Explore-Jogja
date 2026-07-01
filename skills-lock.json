@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "motion-advanced": {
+      "source": "affaan-m/ECC",
+      "sourceType": "github",
+      "skillPath": "skills/motion-advanced/SKILL.md",
+      "computedHash": "9262c4efc37ac56138ee4b3494e71d7cc8939e2446c357a1e1b9b9a21cc39dd2"
+    },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",
