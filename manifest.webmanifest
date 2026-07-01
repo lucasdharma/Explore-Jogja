@@ -1,0 +1,18 @@
+{
+  "name": "Our Yogyakarta — A Guide for Our Guests",
+  "short_name": "Our Yogyakarta",
+  "description": "A quiet, curated guide to the coffee, slow bars and food of Yogyakarta — gathered for the people we love.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F1EDE6",
+  "theme_color": "#F1EDE6",
+  "categories": ["travel", "food", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -7,6 +7,16 @@
 <meta name="description" content="A quiet, curated guide to the coffee, slow bars and food of Yogyakarta — gathered for the people we love." />
 <meta name="theme-color" content="#F1EDE6" />
 
+<!-- PWA: installable, mobile-first -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Our Yogyakarta" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -51,7 +61,13 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .nav.solid a{color:var(--ink)}
 .nav.solid .nav-btn{border-color:var(--line-2)}
 .nav.solid .nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
-@media(max-width:760px){ .nav-left{display:none} .wordmark{font-size:18px; letter-spacing:.34em} .nav-btn{padding:10px 18px} }
+@media(max-width:760px){
+  .nav-inner{height:64px}
+  .nav-left{display:none}
+  /* left-align the wordmark in flow so it never collides with the map button */
+  .wordmark{position:static; transform:none; left:auto; top:auto; font-size:15px; letter-spacing:.16em; padding-left:.16em}
+  .nav-btn{padding:9px 14px; font-size:10px; letter-spacing:.14em}
+}
 
 /* ===== HERO ===== */
 .hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end}
@@ -148,20 +164,45 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pin:active .pill{transform:scale(.96)}
 .pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 0 0 3px var(--pin-color, var(--ink)), 0 7px 20px rgba(40,36,30,.4)}
 
-/* popup — sized dynamically from the map's own dimensions via --popup-w/--popup-h (see sizePopup()) */
-.maplibregl-popup{max-width:var(--popup-w, 292px) !important; transition:max-width .3s ease}
+/* popup — mobile-first, viewport-relative so it always fits and scales with the
+   page/orientation automatically (no JS resizing needed) */
+.maplibregl-popup{max-width:min(80vw, 300px) !important}
 .maplibregl-popup-content{border-radius:0; padding:0; background:var(--paper); border:1px solid var(--line-2); box-shadow:0 20px 50px rgba(40,36,30,.2)}
 .maplibregl-popup-tip{display:none}
-.maplibregl-popup-close-button{color:var(--muted); font-size:22px; line-height:1; padding:10px 13px 0 0; right:0; top:0; background:none}
+.maplibregl-popup-close-button{color:var(--muted); font-size:26px; line-height:1; padding:6px 12px 0 0; right:0; top:0; background:none; min-width:40px; min-height:40px}
 .maplibregl-popup-close-button:hover{background:none; color:var(--ink)}
-.pop{max-height:var(--popup-h, min(60vh,460px)); overflow:auto; padding:28px}
-.pop .eyebrow{color:var(--muted); display:block}
-.pop h3{font-family:var(--serif); font-weight:400; font-size:28px; margin-top:12px; color:var(--ink); line-height:1.12}
-.pop-story{margin-top:16px; font-family:var(--sans); font-weight:300; font-size:14px; line-height:1.75; color:var(--ink-2)}
-.pop-tip{margin-top:20px; padding-top:20px; border-top:1px solid var(--line)}
+.pop{max-height:min(52vh, 420px); overflow:auto; padding:20px 22px}
+.pop .eyebrow{color:var(--muted); display:block; font-size:10px}
+.pop h3{font-family:var(--serif); font-weight:400; font-size:23px; margin-top:10px; color:var(--ink); line-height:1.14}
+.pop-story{margin-top:12px; font-family:var(--sans); font-weight:300; font-size:13.5px; line-height:1.7; color:var(--ink-2)}
+.pop-tip{margin-top:16px; padding-top:16px; border-top:1px solid var(--line)}
 .pop-tip .eyebrow{color:var(--muted)}
-.pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:18px; line-height:1.5; margin-top:9px; color:var(--ink)}
-.pop-link{margin-top:22px}
+.pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:16.5px; line-height:1.45; margin-top:8px; color:var(--ink)}
+.pop-link{margin-top:18px}
+@media(min-width:760px){
+  .maplibregl-popup{max-width:340px !important}
+  .pop{max-height:min(60vh,460px); padding:26px 28px}
+  .pop .eyebrow{font-size:11px}
+  .pop h3{font-size:27px; margin-top:12px}
+  .pop-story{font-size:14px; margin-top:16px}
+  .pop-tip{margin-top:20px; padding-top:20px}
+  .pop-tip .txt{font-size:18px; line-height:1.5}
+}
+
+/* mobile place sheet — on phones the map detail is a bottom sheet instead of an
+   anchored bubble, so it always fits the viewport, scrolls, and never clips
+   against the map edge. Hidden entirely on desktop (the anchored popup is used). */
+.place-sheet{position:fixed; left:0; right:0; bottom:0; z-index:1500; background:var(--paper);
+  border-top:1px solid var(--line-2); border-radius:20px 20px 0 0;
+  box-shadow:0 -24px 60px rgba(40,36,30,.28);
+  transform:translateY(101%); transition:transform .42s cubic-bezier(.2,.7,.2,1);
+  max-height:78vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding:6px 20px calc(24px + env(safe-area-inset-bottom)) 20px}
+.place-sheet.open{transform:none}
+.place-sheet .sheet-handle{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:8px auto 2px}
+.place-sheet .sheet-close{position:absolute; top:10px; right:10px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:0; color:var(--muted); font-size:26px; line-height:1; cursor:pointer}
+.place-sheet .pop{max-height:none; padding:12px 2px 0; overflow:visible}
+@media(min-width:761px){ .place-sheet{display:none !important} }
 
 /* cards */
 .rail-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:64px 0 30px; padding-bottom:20px; border-bottom:1px solid var(--line)}
@@ -258,7 +299,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or Ctrl/Cmd + scroll to zoom. Select any place to read why it earned its spot on our list.</p>
+      <p class="lede">Choose a category, then explore directly on the map. On your phone, use two fingers to move and pinch to zoom; on a computer, hold Ctrl / ⌘ and scroll. Tap any place to read why it earned its spot.</p>
     </div>
 
     <div class="tabs-wrap reveal">
@@ -282,6 +323,9 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="cards" id="cards" aria-label="Places" aria-live="polite"></div>
   </div>
 </main>
+
+<!-- Mobile-only bottom sheet for a selected place (populated by JS) -->
+<div class="place-sheet" id="place-sheet" role="dialog" aria-modal="false" aria-label="Place details" hidden></div>
 
 <footer class="footer" id="details">
   <div class="wrap reveal">
@@ -516,16 +560,6 @@ function loadMapLibre(cb){
   document.head.appendChild(script);
 }
 
-function sizePopup(){
-  const shell=document.querySelector('.map-shell');
-  if(!shell) return;
-  const r=shell.getBoundingClientRect();
-  const w=Math.max(260, Math.min(380, r.width-64));
-  const h=Math.max(320, Math.min(560, r.height*0.7));
-  shell.style.setProperty('--popup-w', Math.round(w)+'px');
-  shell.style.setProperty('--popup-h', Math.round(h)+'px');
-}
-
 function initMap(){
   map = new maplibregl.Map({
     container:'map',
@@ -536,9 +570,7 @@ function initMap(){
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
   map.addControl(new maplibregl.FullscreenControl({container:document.querySelector('.map-shell')}), 'top-right');
-  map.on('click', ()=>setActive(-1));
-  map.on('resize', sizePopup);           /* keep popup proportioned to the map — fires on window resize + fullscreen toggle */
-  sizePopup();
+  map.on('click', ()=>deselect());
   map.on('load', ()=>{
     hideMapStatus();
     /* nudge the palette toward the warm guide look, where the style allows */
@@ -589,16 +621,46 @@ function setActive(idx){
   [...cardsEl.children].forEach(c=>c.classList.toggle('active', +c.dataset.idx===idx));
   refreshDim();
 }
+/* --- place detail: bottom sheet on phones, anchored popup on desktop --- */
+const sheetEl=document.getElementById('place-sheet');
+const mqMobile=window.matchMedia('(max-width:760px)');
+let sheetTimer;
+function openSheet(p){
+  clearTimeout(sheetTimer);
+  sheetEl.innerHTML=`<div class="sheet-handle" aria-hidden="true"></div><button class="sheet-close" type="button" aria-label="Close">&times;</button>${popupHtml(p)}`;
+  sheetEl.hidden=false;
+  sheetEl.querySelector('.sheet-close').addEventListener('click', deselect);
+  requestAnimationFrame(()=>sheetEl.classList.add('open'));
+}
+function closeSheet(){
+  if(sheetEl.hidden) return;
+  sheetEl.classList.remove('open');
+  clearTimeout(sheetTimer);
+  sheetTimer=setTimeout(()=>{ if(!sheetEl.classList.contains('open')){ sheetEl.hidden=true; sheetEl.innerHTML=''; } }, 460);
+}
+function deselect(){
+  if(popup){ popup.remove(); popup=null; }
+  closeSheet();
+  setActive(-1);
+}
+
 function focusPlace(idx, fromCard){
   setActive(idx);
   const p=PLACES[idx];
+  const mobile=mqMobile.matches;
   ensureMap(()=>{
     map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
-    if(popup) popup.remove();
-    popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'292px', offset:20})
-      .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
+    if(popup){ popup.remove(); popup=null; }
+    if(mobile){
+      openSheet(p);
+    } else {
+      closeSheet();
+      popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'none', offset:18})
+        .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
+    }
   });
-  if(!fromCard) cardFor(idx)?.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+  /* Selecting a place on the map shows its detail only — it no longer scrolls the
+     page down to the cards. Tapping a card (fromCard) still just flies the map. */
 }
 function selectCategory(cat){
   if(cat===active) return;
@@ -606,7 +668,7 @@ function selectCategory(cat){
   [...switchEl.querySelectorAll('.tab')].forEach(b=>b.setAttribute('aria-selected', b.dataset.cat===cat?'true':'false'));
   moveHighlight();
   railTitle.textContent=CATS[cat].label;
-  if(popup) popup.remove();
+  deselect();
   cardsEl.style.opacity=0;
   setTimeout(()=>{ renderCards(cat); cardsEl.scrollTo({left:0}); cardsEl.style.transition='opacity .5s'; cardsEl.style.opacity=1; },180);
   renderMarkers(cat);
@@ -638,6 +700,13 @@ const mapObserver=new IntersectionObserver(entries=>{
 addEventListener('load', ()=>{
   renderCards(active);
   mapObserver.observe(document.querySelector('.map-shell'));
+
+  /* PWA: register the service worker (relative path keeps scope at this folder,
+     so it works on a domain root or a GitHub Pages project subpath). Only runs
+     over https / localhost; silently no-ops otherwise. */
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* offline support is optional */ });
+  }
 });
 </script>
 </body>
