@@ -94,11 +94,12 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .tab::before{content:""; position:absolute; left:-8px; right:-8px; top:-14px; bottom:-4px}
 .tab .num{font-family:var(--serif); font-style:italic; font-size:13px; letter-spacing:0; margin-left:8px; opacity:.7}
 .tab::after{content:""; position:absolute; left:0; bottom:0; height:1px; width:100%; background:var(--ink); transform:scaleX(0); transform-origin:center; transition:transform .4s cubic-bezier(.4,0,.2,1)}
-.tab:hover{color:var(--ink)} .tab[aria-selected="true"]{color:var(--ink)} .tab[aria-selected="true"]::after{transform:scaleX(1)}
+.tab:hover{color:var(--ink)} .tab[aria-selected="true"]{color:var(--ink)} .tab[aria-selected="true"]::after{transform:scaleX(1); background:var(--tab-color, var(--ink))}
 
 /* map — the highlight */
-.map-shell{position:relative; width:100%; height:72vh; min-height:480px; border:1px solid var(--line); overflow:hidden; background:var(--surface-2)}
-@media(min-width:920px){ .map-shell{height:clamp(600px,82vh,900px)} }
+.map-shell{position:relative; width:100%; height:76vh; min-height:520px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:var(--surface-2); box-shadow:0 40px 90px -40px rgba(40,36,30,.4); margin:8px 0 70px}
+@media(min-width:920px){ .map-shell{height:clamp(640px,88vh,980px)} }
+@media(max-width:760px){ .map-shell{margin-bottom:48px} }
 #map{position:absolute; inset:0}
 .maplibregl-map{font-family:var(--sans)}
 .maplibregl-ctrl-group{border:none !important; border-radius:12px !important; box-shadow:0 3px 12px rgba(40,36,30,.22) !important; background:var(--white) !important; overflow:hidden; margin:14px !important}
@@ -117,20 +118,20 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pin{opacity:0; transition:opacity .45s ease; cursor:pointer}
 .pin.show{opacity:1}
 .pin.dim{opacity:.42}
-.pin .pill{background:var(--paper); color:var(--ink); border:1px solid var(--line-2); border-radius:999px; padding:7px 13px;
+.pin .pill{background:var(--paper); color:var(--ink); border:1.5px solid var(--pin-color, var(--line-2)); border-radius:999px; padding:7px 13px;
   font-family:var(--sans); font-weight:400; font-size:12px; line-height:1; white-space:nowrap; box-shadow:0 2px 9px rgba(40,36,30,.22);
   transition:transform .18s ease, background .22s, color .22s, box-shadow .22s}
 .pin:hover .pill{transform:scale(1.06); box-shadow:0 5px 15px rgba(40,36,30,.3)}
 .pin:active .pill{transform:scale(.96)}
-.pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 7px 20px rgba(40,36,30,.4)}
+.pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 0 0 3px var(--pin-color, var(--ink)), 0 7px 20px rgba(40,36,30,.4)}
 
-/* popup */
-.maplibregl-popup{max-width:292px !important}
+/* popup — sized dynamically from the map's own dimensions via --popup-w/--popup-h (see sizePopup()) */
+.maplibregl-popup{max-width:var(--popup-w, 292px) !important; transition:max-width .3s ease}
 .maplibregl-popup-content{border-radius:0; padding:0; background:var(--paper); border:1px solid var(--line-2); box-shadow:0 20px 50px rgba(40,36,30,.2)}
 .maplibregl-popup-tip{display:none}
 .maplibregl-popup-close-button{color:var(--muted); font-size:22px; line-height:1; padding:10px 13px 0 0; right:0; top:0; background:none}
 .maplibregl-popup-close-button:hover{background:none; color:var(--ink)}
-.pop{max-height:min(60vh,460px); overflow:auto; padding:28px}
+.pop{max-height:var(--popup-h, min(60vh,460px)); overflow:auto; padding:28px}
 .pop .eyebrow{color:var(--muted); display:block}
 .pop h3{font-family:var(--serif); font-weight:400; font-size:28px; margin-top:12px; color:var(--ink); line-height:1.12}
 .pop-story{margin-top:16px; font-family:var(--sans); font-weight:300; font-size:14px; line-height:1.75; color:var(--ink-2)}
@@ -156,6 +157,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .card .c-img::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(43,41,36,0) 55%, rgba(43,41,36,.16)); opacity:0; transition:opacity .5s}
 .card:hover .c-img::after{opacity:1}
 .card .c-cat{display:block; margin-top:20px; font-family:var(--sans); font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+.cat-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--dot, var(--muted)); margin-right:6px; vertical-align:middle}
 .card h4{font-family:var(--serif); font-weight:400; font-size:27px; margin-top:10px; color:var(--ink); line-height:1.15}
 .card .c-desc{margin-top:12px; font-family:var(--sans); font-weight:300; font-size:14.5px; line-height:1.7; color:var(--ink-2);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
@@ -237,14 +239,16 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     </div>
 
     <div class="tabs reveal" id="switch" role="tablist" aria-label="Choose a category"></div>
+  </div>
 
-    <div class="map-shell reveal">
-      <div id="map"></div>
-      <div class="legend"><span class="dot"></span><span id="legend-text" aria-live="polite">Loading…</span></div>
-    </div>
+  <div class="map-shell reveal">
+    <div id="map"></div>
+    <div class="legend"><span class="dot"></span><span id="legend-text" aria-live="polite">Loading…</span></div>
+  </div>
 
+  <div class="wrap">
     <div class="rail-head">
-      <h3 id="rail-title">Coffee</h3>
+      <h3 id="rail-title">All</h3>
       <span class="hint">Drag to browse &rarr;</span>
     </div>
     <div class="cards" id="cards" aria-label="Places" aria-live="polite"></div>
@@ -371,12 +375,17 @@ const PLACES = [
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
 ];
 
-const CATS = { coffee:{label:"Coffee"}, slowbar:{label:"Slow Bar"}, food:{label:"Foodies"} };
-const ORDER = ["coffee","slowbar","food"];
+const CATS = {
+  all:     { label:"All",      color:null },
+  coffee:  { label:"Coffee",   color:"#A67C52" },
+  slowbar: { label:"Slow Bar", color:"#6E4A5E" },
+  food:    { label:"Foodies",  color:"#5F7350" }
+};
+const ORDER = ["all","coffee","slowbar","food"];
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
 function gradFor(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0; const g=GRADS[h%GRADS.length]; return `linear-gradient(150deg,${g[0]},${g[1]})`; }
 
-let map, markers = [], popup, active = "coffee", activeIdx = -1;
+let map, markers = [], popup, active = "all", activeIdx = -1;
 const switchEl=document.getElementById('switch');
 const cardsEl=document.getElementById('cards');
 const legendEl=document.getElementById('legend-text');
@@ -393,16 +402,17 @@ function makeDraggable(el){
 makeDraggable(cardsEl);
 
 ORDER.forEach((key,i)=>{
-  const c=CATS[key], n=PLACES.filter(p=>p.category===key).length;
+  const c=CATS[key], n = key==='all' ? PLACES.length : PLACES.filter(p=>p.category===key).length;
   const btn=document.createElement('button');
   btn.className='tab'; btn.dataset.cat=key; btn.setAttribute('role','tab'); btn.setAttribute('aria-selected', i===0?'true':'false');
   btn.setAttribute('aria-controls','cards');
+  if(c.color) btn.style.setProperty('--tab-color', c.color);
   btn.innerHTML=`${c.label}<span class="num">${n}</span>`;
   btn.addEventListener('click', ()=>selectCategory(key));
   switchEl.appendChild(btn);
 });
 
-const placesFor = cat => PLACES.map((p,i)=>({...p,_i:i})).filter(p=>p.category===cat);
+const placesFor = cat => PLACES.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
 const pinFor  = idx => { const m=markers.find(x=>x.idx===idx); return m? m.el : null; };
 const lngLat  = p => [p.coords[1], p.coords[0]];   /* MapLibre uses [lng, lat] */
@@ -416,7 +426,7 @@ function renderCards(cat){
     const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async">` : ``;
     card.innerHTML=`
       <div class="c-img" style="--g:${gradFor(p.name)}">${img}</div>
-      <span class="c-cat">${CATS[cat].label} &nbsp;·&nbsp; ${p.area}</span>
+      <span class="c-cat"><span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
       <h4>${p.name}</h4>
       <p class="c-desc">${p.story}</p>
       <span class="c-more link-u">Discover more <span>&rarr;</span></span>`;
@@ -451,6 +461,16 @@ function loadMapLibre(cb){
   document.head.appendChild(script);
 }
 
+function sizePopup(){
+  const shell=document.querySelector('.map-shell');
+  if(!shell) return;
+  const r=shell.getBoundingClientRect();
+  const w=Math.max(260, Math.min(380, r.width-64));
+  const h=Math.max(320, Math.min(560, r.height*0.7));
+  shell.style.setProperty('--popup-w', Math.round(w)+'px');
+  shell.style.setProperty('--popup-h', Math.round(h)+'px');
+}
+
 function initMap(){
   map = new maplibregl.Map({
     container:'map',
@@ -463,6 +483,8 @@ function initMap(){
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
   map.addControl(new maplibregl.FullscreenControl({container:document.querySelector('.map-shell')}), 'top-right');
   map.on('click', ()=>setActive(-1));
+  map.on('resize', sizePopup);           /* keep popup proportioned to the map — fires on window resize + fullscreen toggle */
+  sizePopup();
   map.on('load', ()=>{
     /* nudge the palette toward the warm guide look, where the style allows */
     try{ if(map.getLayer('water')) map.setPaintProperty('water','fill-color','#bfe2f0'); }catch(e){}
@@ -477,6 +499,7 @@ function renderMarkers(cat){
     const el=document.createElement('div');
     el.className='pin';
     el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label', `Show ${p.name} on the map`);
+    el.style.setProperty('--pin-color', CATS[p.category].color);
     el.innerHTML=`<div class="pill">${p.name}</div>`;
     el.addEventListener('click', ev=>{ ev.stopPropagation(); focusPlace(p._i,false); });
     el.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); focusPlace(p._i,false); } });
@@ -490,7 +513,7 @@ function renderMarkers(cat){
     list.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
   }
-  legendEl.textContent=`${list.length} ${CATS[cat].label} spots we love`;
+  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
   requestAnimationFrame(()=>markers.forEach(m=>m.el.classList.add('show')));
 }
 
@@ -542,7 +565,7 @@ const mapObserver=new IntersectionObserver(entries=>{
 },{rootMargin:'600px 0px'});
 
 addEventListener('load', ()=>{
-  renderCards('coffee');
+  renderCards(active);
   mapObserver.observe(document.querySelector('.map-shell'));
 });
 </script>
