@@ -103,13 +103,16 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .ex-head h2{margin-top:20px; font-size:clamp(34px,5.2vw,60px); font-weight:300}
 .ex-head p{margin:22px auto 0; max-width:560px}
 
-/* seamless segmented category control — one pill, a sliding colour highlight, no gaps between segments */
-.tabs-wrap{display:flex; justify-content:center; margin-bottom:48px}
-.tabs{position:relative; display:inline-flex; align-items:center; gap:2px; max-width:100%;
+/* seamless segmented category control — one pill, a sliding colour highlight,
+   floated over the top of the map so filtering never means leaving the map
+   (and stays available in fullscreen) */
+.tabs{position:absolute; z-index:6; top:16px; left:50%; transform:translateX(-50%);
+  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 660px);
   padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:999px;
+  box-shadow:0 8px 28px rgba(40,36,30,.22);
   overflow-x:auto; scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-@media(max-width:760px){ .tabs-wrap{justify-content:flex-start} .tabs{max-width:none} }
+@media(max-width:760px){ .tabs{top:12px; left:12px; right:66px; transform:none; max-width:none} }
 .tab-highlight{position:absolute; top:6px; left:0; height:calc(100% - 12px); width:0; border-radius:999px;
   background:var(--ink); box-shadow:0 8px 20px rgba(40,36,30,.28);
   transition:transform .5s cubic-bezier(.65,0,.35,1), width .5s cubic-bezier(.65,0,.35,1), background .35s ease;
@@ -312,13 +315,11 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
       <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot.</p>
     </div>
 
-    <div class="tabs-wrap reveal">
-      <div class="tabs" id="switch" role="tablist" aria-label="Choose a category"></div>
-    </div>
   </div>
 
   <div class="map-shell reveal" id="map-area">
     <div id="map"></div>
+    <div class="tabs" id="switch" role="tablist" aria-label="Filter places by category"></div>
     <div class="map-status" id="map-status" aria-live="polite">
       <span class="map-status-text">
         <img class="load-dogs" src="assets/dogs-running.png" alt="" width="720" height="350" decoding="async" />
