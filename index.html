@@ -128,7 +128,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 @media(max-width:760px){ .tab{padding:11px 16px 11px 12px; font-size:11px} }
 
 /* map — the highlight */
-.map-shell{position:relative; width:100%; height:76vh; min-height:520px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:var(--surface-2); box-shadow:0 40px 90px -40px rgba(40,36,30,.4); margin:8px 0 70px}
+/* scroll-margin = fixed nav height + the 24px the .reveal animation lifts the
+   shell after the jump, so a first-visit anchor click lands flush under the nav */
+.map-shell{position:relative; width:100%; height:76vh; min-height:520px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:var(--surface-2); box-shadow:0 40px 90px -40px rgba(40,36,30,.4); margin:8px 0 70px; scroll-margin-top:102px}
+@media(max-width:760px){ .map-shell{scroll-margin-top:88px} }
 @media(min-width:920px){ .map-shell{height:clamp(640px,88vh,980px)} }
 @media(max-width:760px){ .map-shell{margin-bottom:48px} }
 #map{position:absolute; inset:0}
@@ -180,13 +183,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:16.5px; line-height:1.45; margin-top:8px; color:var(--ink)}
 .pop-link{margin-top:18px}
 @media(min-width:760px){
-  .maplibregl-popup{max-width:340px !important}
-  .pop{max-height:min(60vh,460px); padding:26px 28px}
-  .pop .eyebrow{font-size:11px}
-  .pop h3{font-size:27px; margin-top:12px}
-  .pop-story{font-size:14px; margin-top:16px}
-  .pop-tip{margin-top:20px; padding-top:20px}
-  .pop-tip .txt{font-size:18px; line-height:1.5}
+  /* proportional to the window: ~22vw wide and ~36vh tall, clamped — resizing or
+     zooming the browser rescales it instead of leaving a fixed oversized box */
+  .maplibregl-popup{max-width:clamp(230px, 22vw, 310px) !important}
+  .pop{max-height:clamp(220px, 36vh, 380px); padding:20px 22px}
+  .pop .eyebrow{font-size:10.5px}
+  .pop h3{font-size:clamp(20px, 1.7vw, 24px); margin-top:10px}
+  .pop-story{font-size:13.5px; margin-top:13px}
+  .pop-tip{margin-top:16px; padding-top:16px}
+  .pop-tip .txt{font-size:16px; line-height:1.45}
 }
 
 /* mobile place sheet — on phones the map detail is a bottom sheet instead of an
@@ -196,8 +201,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   border-top:1px solid var(--line-2); border-radius:20px 20px 0 0;
   box-shadow:0 -24px 60px rgba(40,36,30,.28);
   transform:translateY(101%); transition:transform .42s cubic-bezier(.2,.7,.2,1);
-  max-height:78vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  max-height:72vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain; touch-action:pan-y;
   padding:6px 20px calc(24px + env(safe-area-inset-bottom)) 20px}
+.place-sheet.dragging{transition:none}
 .place-sheet.open{transform:none}
 .place-sheet .sheet-handle{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:8px auto 2px}
 .place-sheet .sheet-close{position:absolute; top:10px; right:10px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:0; color:var(--muted); font-size:26px; line-height:1; cursor:pointer}
@@ -251,14 +258,14 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </style>
 </head>
 <body>
-<a class="skip-link" href="#explore">Skip to the map</a>
+<a class="skip-link" href="#map-area">Skip to the map</a>
 <div class="grain" aria-hidden="true"></div>
 
 <nav class="nav" id="nav">
   <div class="nav-inner wrap">
     <a class="nav-left" href="#details">The Details</a>
     <a class="wordmark" href="#top" id="wordmark">HILGA &amp; LUCAS</a>
-    <a class="nav-btn" href="#explore">The Map</a>
+    <a class="nav-btn" href="#map-area">The Map</a>
   </div>
 </nav>
 
@@ -299,7 +306,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map. On your phone, use two fingers to move and pinch to zoom; on a computer, hold Ctrl / ⌘ and scroll. Tap any place to read why it earned its spot.</p>
+      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot.</p>
     </div>
 
     <div class="tabs-wrap reveal">
@@ -307,7 +314,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     </div>
   </div>
 
-  <div class="map-shell reveal">
+  <div class="map-shell reveal" id="map-area">
     <div id="map"></div>
     <div class="map-status" id="map-status" aria-live="polite">
       <span class="map-status-text">Loading the map…</span>
@@ -565,8 +572,9 @@ function initMap(){
     container:'map',
     style:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
     center:[110.395,-7.79], zoom:11.2,
-    attributionControl:true, cooperativeGestures:true, dragRotate:false, pitchWithRotate:false
+    attributionControl:true, cooperativeGestures:false, dragRotate:false, pitchWithRotate:false
   });
+  map.scrollZoom.enable();               /* plain scroll-wheel zoom, no Ctrl needed */
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
   map.addControl(new maplibregl.FullscreenControl({container:document.querySelector('.map-shell')}), 'top-right');
@@ -643,6 +651,29 @@ function deselect(){
   closeSheet();
   setActive(-1);
 }
+
+/* swipe-down to dismiss: only engages when the sheet is scrolled to its top and
+   the finger moves downward, so scrolling the sheet's own content still works */
+let sheetStartY=0, sheetDY=0, sheetDragging=false;
+sheetEl.addEventListener('touchstart', e=>{
+  if(sheetEl.scrollTop>0) return;
+  sheetStartY=e.touches[0].clientY; sheetDY=0; sheetDragging=true;
+}, {passive:true});
+sheetEl.addEventListener('touchmove', e=>{
+  if(!sheetDragging) return;
+  sheetDY=e.touches[0].clientY-sheetStartY;
+  if(sheetDY>0){
+    sheetEl.classList.add('dragging');
+    sheetEl.style.transform=`translateY(${sheetDY}px)`;
+  }
+}, {passive:true});
+sheetEl.addEventListener('touchend', ()=>{
+  if(!sheetDragging) return;
+  sheetDragging=false;
+  sheetEl.classList.remove('dragging');
+  sheetEl.style.transform='';
+  if(sheetDY>80) deselect();
+});
 
 function focusPlace(idx, fromCard){
   setActive(idx);
