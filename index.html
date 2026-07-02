@@ -147,6 +147,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   background:var(--surface-2); transition:opacity .4s ease}
 .map-status.hidden{opacity:0; pointer-events:none}
 .map-status-text{font-family:var(--sans); font-size:13px; letter-spacing:.06em; color:var(--muted); max-width:320px}
+.load-dogs{display:block; width:min(210px, 48vw); height:auto; margin:0 auto 16px; animation:trot 1.15s ease-in-out infinite}
+@keyframes trot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .map-status-text b{display:block; margin-bottom:10px; font-family:var(--serif); font-style:italic; font-weight:400; font-size:20px; letter-spacing:0; color:var(--ink)}
 .map-retry{margin-top:16px; display:inline-flex; font-family:var(--sans); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); background:none; border:1px solid var(--line-2); border-radius:999px; padding:10px 20px; cursor:pointer; min-height:44px; align-items:center}
 .map-retry:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
@@ -244,7 +246,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .footer .meta div:last-child{border-right:0}
 .footer .meta small{display:block; font-family:var(--sans); font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
 .footer .meta b{display:block; margin-top:12px; font-family:var(--serif); font-weight:400; font-size:24px}
-.footer .fmark{margin-top:72px; font-family:var(--serif); font-size:22px; letter-spacing:.42em; padding-left:.42em; color:var(--ink)}
+.footer-art{display:block; width:min(600px, 84vw); height:auto; margin:70px auto 0}
+.footer .fmark{margin-top:40px; font-family:var(--serif); font-size:22px; letter-spacing:.42em; padding-left:.42em; color:var(--ink)}
 @media(max-width:760px){ .footer .meta{flex-direction:column; gap:34px} .footer .meta div{border-right:0; padding:0} }
 
 .skip-link{position:absolute; left:-999px; top:0; z-index:2000; background:var(--ink); color:var(--surface); padding:14px 22px; font-family:var(--sans); font-size:12px; letter-spacing:.15em; text-transform:uppercase; text-decoration:none}
@@ -317,7 +320,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   <div class="map-shell reveal" id="map-area">
     <div id="map"></div>
     <div class="map-status" id="map-status" aria-live="polite">
-      <span class="map-status-text">Loading the map…</span>
+      <span class="map-status-text">
+        <img class="load-dogs" src="assets/dogs-running.png" alt="" width="720" height="350" decoding="async" />
+        Loading the map…
+      </span>
     </div>
     <div class="legend"><span class="dot"></span><span id="legend-text" aria-live="polite">Loading…</span></div>
   </div>
@@ -343,6 +349,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
       <div><small>The city</small><b>Yogyakarta</b></div>
       <div><small>Dress code</small><b>Garden Formal</b></div>
     </div>
+    <img class="footer-art" src="assets/couple-dogs.png" alt="Illustration of Hilga and Lucas walking hand in hand, their three dogs running ahead" width="1400" height="705" loading="lazy" decoding="async" />
     <div class="fmark">HILGA &amp; LUCAS</div>
   </div>
 </footer>
