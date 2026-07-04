@@ -8,7 +8,7 @@
    - Map library + tiles (cross-origin, and useless offline anyway): not cached —
      they go straight to the network and fail gracefully via the in-page handler. */
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 const SHELL_CACHE = `oy-shell-${VERSION}`;
 const FONT_CACHE = `oy-fonts-${VERSION}`;
 
