@@ -34,7 +34,7 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
-body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
 h1,h2,h3{font-family:var(--serif); font-weight:300; margin:0; line-height:1.08}
 p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; display:block}
 :focus-visible{outline:1px solid var(--ink); outline-offset:4px}
@@ -89,12 +89,40 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:3; color:rgba(245,241,234,.75); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
 
-/* ===== NOTE ===== */
-.note{padding:var(--section-gap) 0; text-align:center}
+/* ===== NOTE — the floating gallery =====
+   A tall scroll track with a sticky 100svh stage. The quote stays pinned in the
+   centre while photos drift past at different 3D depths (CSS perspective +
+   scroll-driven transforms in JS), so the pictures move with the scroll wheel. */
+.note{position:relative; height:260vh; padding:0}
+.note-sticky{position:sticky; top:0; height:100svh; overflow:hidden; display:flex; align-items:center; justify-content:center; perspective:1100px}
+.note-quote{position:relative; z-index:2; text-align:center}
 .note .eyebrow{color:var(--muted)}
 .note .rule{width:1px; height:56px; background:var(--line-2); margin:0 auto 40px}
 .note p{font-family:var(--serif); font-weight:300; font-style:italic; font-size:clamp(26px,3.6vw,40px); line-height:1.45; max-width:900px; margin:26px auto 0; color:var(--ink)}
 .note .sign{margin-top:34px; color:var(--muted)}
+.note-floats{position:absolute; inset:0; z-index:1; pointer-events:none; transform-style:preserve-3d}
+.gfloat{position:absolute; left:var(--x); top:var(--y); width:var(--w); margin:0; padding:9px 9px 12px;
+  background:var(--paper); border:1px solid var(--line); box-shadow:0 14px 40px rgba(40,36,30,.18);
+  transform:rotate(var(--rot)); will-change:transform}
+.gfloat.front{z-index:3}
+.gfloat img{width:100%; height:auto; display:block; filter:saturate(.9)}
+.gfloat figcaption{margin-top:8px; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--muted); text-align:center; line-height:1.3}
+@media(max-width:760px){
+  .note{height:210vh}
+  .gfloat{width:calc(var(--w) * .58); padding:6px 6px 8px}
+  .gfloat.front{z-index:1}   /* keep the quote readable: photos always drift behind the text on phones */
+  .gfloat figcaption{font-size:11px; margin-top:5px}
+  .gfloat.hide-m{display:none}
+  /* nudge the two mid-band photos away from the quote's resting position
+     (!important because per-item positions are set as inline style vars) */
+  .note-floats .gfloat:nth-child(3){--y:16% !important}
+  .note-floats .gfloat:nth-child(4){--y:64% !important}
+}
+@media (prefers-reduced-motion: reduce){
+  .note{height:auto; padding:var(--section-gap) 0}
+  .note-sticky{position:static; height:auto; padding:60px 0}
+  .note-floats{display:none}
+}
 
 /* ===== EXPLORE ===== */
 .explore{padding:0 0 var(--section-gap)}
@@ -297,8 +325,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </header>
 
 <section class="note" id="note">
-  <div class="wrap">
-    <div class="reveal">
+  <div class="note-sticky">
+    <div class="note-floats" aria-hidden="true">
+      <figure class="gfloat front"        data-depth="1.3"  data-z="90"   data-dx="-30" style="--x:12%; --y:6%;  --w:250px; --rot:-4deg"><img src="assets/places/merapi-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mount Merapi</figcaption></figure>
+      <figure class="gfloat"              data-depth="0.9"  data-z="-140" data-dx="24"  style="--x:74%; --y:10%; --w:220px; --rot:3deg"><img src="assets/places/sate-klathak-pak-bari-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Sate Klathak Pak Bari</figcaption></figure>
+      <figure class="gfloat front"        data-depth="1.6"  data-z="140"  data-dx="-40" style="--x:3%;  --y:38%; --w:190px; --rot:-6deg"><img src="assets/places/warung-bu-kadek-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Warung Bu Kadek</figcaption></figure>
+      <figure class="gfloat"              data-depth="1.1"  data-z="-60"  data-dx="36"  style="--x:80%; --y:42%; --w:200px; --rot:5deg"><img src="assets/places/djaya-roasters-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Djaya Roasters</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="0.7"  data-z="-220" data-dx="-18" style="--x:12%; --y:66%; --w:180px; --rot:4deg"><img src="assets/places/suara-dewandaru-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Suara Dewandaru</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="1.2"  data-z="30"   data-dx="22"  style="--x:60%; --y:2%;  --w:150px; --rot:-3deg"><img src="assets/places/tusen-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>TUSEN</figcaption></figure>
+      <figure class="gfloat front"        data-depth="1.45" data-z="110"  data-dx="30"  style="--x:56%; --y:70%; --w:190px; --rot:-5deg"><img src="assets/places/bubur-yoyong-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Bubur Yoyong</figcaption></figure>
+      <figure class="gfloat"              data-depth="1.0"  data-z="-30"  data-dx="-26" style="--x:78%; --y:74%; --w:230px; --rot:2deg"><img src="assets/places/kopi-bukan-luwak-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Kopi Bukan Luwak</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="0.8"  data-z="-180" data-dx="14"  style="--x:38%; --y:3%;  --w:160px; --rot:6deg"><img src="assets/places/mie-sapi-banteng-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mie Sapi Banteng</figcaption></figure>
+    </div>
+    <div class="wrap note-quote reveal">
       <div class="rule"></div>
       <span class="eyebrow">From us, to you</span>
       <p>“Jogja is small enough to wander on foot and warm enough to feel like home by the second day. Choose a craving, and let the map lead the way.”</p>
@@ -368,11 +407,11 @@ const PLACES = [
     blurb:"A buzzy all-day cafe — and very good matcha.",
     story:"A local favourite with branches across the city: generous indoor and outdoor seating, arabica coffee, pastries and rice bowls. Easy to settle into for an hour or three.",
     note:"Order the matcha. Comfortable for working; busiest in the evenings." },
-  { category:"coffee", name:"Djaya Roasters", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
+  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
     blurb:"A small roastery for people who take coffee seriously.",
     story:"A minimal, focused coffee bar and roastery with local, imported and exotic beans — strong on manual brews, and you can buy beans to take home.",
     note:"Ask for a manual brew and let the barista choose the bean. Free parking." },
-  { category:"coffee", name:"Suara Dewandaru", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
+  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
     blurb:"A bamboo-forest cafe with vinyl, jazz and mocktails.",
     story:"Tucked into the cooler hills north of the city, ringed by bamboo, with a vinyl soundtrack and a menu of coffee and mocktails. Peaceful, a little remote, lovely by daylight.",
     note:"The Mocktail Dewandaru is the one. The lane in is narrow — come before dusk." },
@@ -398,7 +437,7 @@ const PLACES = [
     note:"The ceremonial matcha latte; ask for less sugar if you like it grassy." },
 
   /* SLOW BAR */
-  { category:"slowbar", name:"TUSEN", area:"Kotabaru", coords:[-7.7857793,110.3707008],
+  { category:"slowbar", name:"TUSEN", img:"assets/places/tusen.jpg", area:"Kotabaru", coords:[-7.7857793,110.3707008],
     blurb:"A speakeasy-style cocktail bar with great music.",
     story:"An intimate cocktail bar in Kotabaru with inventive drinks, craft beer and a calm, music-led room. The later evening is 21+.",
     note:"Sit at the bar and let the bartender choose. Evenings only, from 5pm." },
@@ -412,15 +451,15 @@ const PLACES = [
     note:"Great for a relaxed group evening. Note the tax and service charge." },
 
   /* FOOD */
-  { category:"food", name:"Sate Klathak Pak Pong", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
+  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
     blurb:"The legendary goat sate grilled on iron spokes.",
     story:"Perhaps Jogja's most famous sate klathak: chunks of goat seasoned simply with salt, grilled on iron bicycle spokes, served with a warm curry broth. Worth the trip out to Bantul.",
     note:"Don't skip the gulai. It's a 25–30 minute drive south of the centre." },
-  { category:"food", name:"Sate Klathak Pak Bari", area:"Pasar Wonokromo · Bantul", coords:[-7.8707352,110.3921127],
+  { category:"food", name:"Sate Klathak Pak Bari", img:"assets/places/sate-klathak-pak-bari.jpg", area:"Pasar Wonokromo · Bantul", coords:[-7.8707352,110.3921127],
     blurb:"Iron-skewer goat sate, cooked inside a night market.",
     story:"Sate klathak grilled by Pak Bari himself in a stall inside Wonokromo Market — tender, salt-grilled goat with curry broth, in a bustling, no-frills setting. Evenings only.",
     note:"Arrive before 7pm — it opens at 6:30 and fills up fast." },
-  { category:"food", name:"Kopi Bukan Luwak", area:"Kaliurang · Pakem", coords:[-7.6706033,110.4194033],
+  { category:"food", name:"Kopi Bukan Luwak", img:"assets/places/kopi-bukan-luwak.jpg", area:"Kaliurang · Pakem", coords:[-7.6706033,110.4194033],
     blurb:"Kampung-style Javanese feasting in a joglo, up north.",
     story:"From the people behind Kopi Klotok, but calmer: self-service Javanese village cooking — mangut asap, telur gimbal, mendoan — in a traditional joglo near Kaliurang. You pay at the end by showing a photo of your plate.",
     note:"Go early for coro bikang from 7am. The smoked-fish mangut asap is the pick." },
@@ -428,35 +467,35 @@ const PLACES = [
     blurb:"Arguably the best ramen in the city.",
     story:"A hugely popular Japanese ramen spot on Jl. Magelang, known for rich broths and tender wagyu and saikoro beef. Expect a queue.",
     note:"The Saikoro and Wagyu Baitan are the bestsellers — arrive early or reserve." },
-  { category:"food", name:"Ayam Geprek Bu Made", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
+  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
     blurb:"Smashed fried chicken with a serious sambal.",
     story:"A beloved blue-tent warung where they truly geprek the chicken — crisp, tender, then smashed with a punchy sambal bawang. Pick your pieces and chilli level at the counter.",
     note:"The sambal is no joke — ask for fewer chillies if unsure. Don't miss the tongseng." },
-  { category:"food", name:"Gudeg Bromo (Bu Tekluk)", area:"Jl. Affandi · Gejayan", coords:[-7.7737295,110.3895916],
+  { category:"food", name:"Gudeg Bromo (Bu Tekluk)", img:"assets/places/gudeg-bromo.jpg", area:"Jl. Affandi · Gejayan", coords:[-7.7737295,110.3895916],
     blurb:"Late-night gudeg — savoury and spicy, not sweet.",
     story:"A famous sidewalk gudeg on Jl. Affandi that flips the script: savoury and spicy rather than sweet, with a bold krecek, eaten lesehan-style on mats. Opens around 10:30pm until dawn.",
     note:"A proper late-night supper — go for the spicy krecek and areh." },
-  { category:"food", name:"Warung Bu Kadek Khas Bali", area:"Kalasan · Sleman", coords:[-7.7714215,110.4468392],
+  { category:"food", name:"Warung Bu Kadek Khas Bali", img:"assets/places/warung-bu-kadek.jpg", area:"Kalasan · Sleman", coords:[-7.7714215,110.4468392],
     blurb:"Authentic Balinese nasi campur (pork / non-halal).",
     story:"Some of the best Balinese food in Jogja — bold, spicy nasi campur babi with tender pork and proper sambal. A taste of Bali east of the city. Closed Mondays.",
     note:"The nasi campur and babi goreng. There's a special menu on Sundays." },
-  { category:"food", name:"Bubur Yoyong", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
+  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
     blurb:"Chinese-style morning porridge with stir-fried toppings.",
     story:"A long-running breakfast spot serving light, well-seasoned porridge with unusual stir-fried toppings, plus nasi gongso and Hainan fried rice. Mornings only, closed Sundays.",
     note:"A great early breakfast — try the nasi gongso and add cakwe." },
-  { category:"food", name:"Tio Ciu Bang Sinyo", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
+  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
     blurb:"Generous, comforting Teochew-style Chinese food.",
     story:"A long-time student favourite near Mrican: big portions of Teochew-Chinese cooking at gentle prices — five-spice ngohyang chicken, kangkung hotplate, seafood hotplate.",
     note:"The ngohyang chicken and a hotplate. Cheap, fast, always packed." },
-  { category:"food", name:"Mie Sapi Banteng", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
+  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
     blurb:"Springy beef noodles — and the best wontons.",
     story:"A noodle shop known for thin, springy beef noodles and outstanding pangsit (wontons), both fried and boiled. Closed Thursdays and Sundays.",
     note:"Order both the boiled and fried pangsit. Lunchtime only." },
-  { category:"food", name:"Sate Babi Koh Ben", area:"Kricak · Tegalrejo", coords:[-7.7682427,110.3549044],
+  { category:"food", name:"Sate Babi Koh Ben", img:"assets/places/sate-babi-koh-ben.jpg", area:"Kricak · Tegalrejo", coords:[-7.7682427,110.3549044],
     blurb:"Tender pork sate in a leafy, tucked-away spot (non-halal).",
     story:"A Chinese-Indonesian pork specialist set among trees inside the Puskat compound: juicy grilled sate babi, rich babi kecap and pork bakso.",
     note:"The sate babi and babi kecap. A calm, green setting." },
-  { category:"food", name:"Bakmi Jawa Mas Timbul", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
+  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
     blurb:"Charcoal-cooked Javanese noodles, late into the night.",
     story:"Authentic bakmi Jawa cooked over a charcoal fire — smoky bakmi godog and goreng, ayam rica, magelangan — in a warm, traditional room with an angkringan section. Open till 2am.",
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
@@ -719,6 +758,30 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
 const nav=document.getElementById('nav');
 addEventListener('scroll', ()=>{ nav.classList.toggle('solid', window.scrollY > window.innerHeight*0.72); }, {passive:true});
+
+/* ---- floating gallery: photos drift with the scroll wheel at depth-scaled speeds ---- */
+const noteEl=document.querySelector('.note');
+const gfloats=[...document.querySelectorAll('.gfloat')];
+gfloats.forEach(f=>{ f.dataset.rot=(getComputedStyle(f).getPropertyValue('--rot')||'0deg').trim(); });
+function galleryFrame(){
+  const r=noteEl.getBoundingClientRect();
+  const total=Math.max(1, r.height-innerHeight);
+  const p=Math.min(1, Math.max(0, -r.top/total));      /* 0→1 through the section */
+  const travel=Math.min(300, innerHeight*0.34);
+  gfloats.forEach(f=>{
+    const d=+f.dataset.depth||1, z=+f.dataset.z||0, dx=+f.dataset.dx||0;
+    const y=(0.5-p)*2*travel*d;
+    const x=(0.5-p)*2*dx;
+    f.style.transform=`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z}px) rotate(${f.dataset.rot})`;
+  });
+}
+if(noteEl && gfloats.length && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let gTick=false;
+  const onGScroll=()=>{ if(!gTick){ gTick=true; requestAnimationFrame(()=>{ gTick=false; galleryFrame(); }); } };
+  addEventListener('scroll', onGScroll, {passive:true});
+  addEventListener('resize', onGScroll, {passive:true});
+  galleryFrame();
+}
 let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>{ map&&map.resize(); moveHighlight(); },200); }
 addEventListener('resize', reflow); addEventListener('orientationchange', reflow);
 
