@@ -877,17 +877,28 @@ addEventListener('scroll', ()=>{ nav.classList.toggle('solid', window.scrollY > 
 /* ---- floating gallery: photos drift with the scroll wheel at depth-scaled speeds ---- */
 const noteEl=document.querySelector('.note');
 const gfloats=[...document.querySelectorAll('.gfloat')];
-gfloats.forEach(f=>{ f.dataset.rot=(getComputedStyle(f).getPropertyValue('--rot')||'0deg').trim(); });
+gfloats.forEach(f=>{ f.dataset.rotBase=parseFloat(getComputedStyle(f).getPropertyValue('--rot'))||0; });
 function galleryFrame(){
   const r=noteEl.getBoundingClientRect();
   const total=Math.max(1, r.height-innerHeight);
   const p=Math.min(1, Math.max(0, -r.top/total));      /* 0→1 through the section */
   const travel=Math.min(300, innerHeight*0.34);
-  gfloats.forEach(f=>{
+  const midY=innerHeight/2;
+  /* read positions first (from the previous frame's transforms), then write —
+     avoids interleaved layout reads/writes */
+  const centers=gfloats.map(f=>{ const b=f.getBoundingClientRect(); return b.top+b.height/2; });
+  gfloats.forEach((f,i)=>{
     const d=+f.dataset.depth||1, z=+f.dataset.z||0, dx=+f.dataset.dx||0;
+    const phase=i*1.7;
     const y=(0.5-p)*2*travel*d;
-    const x=(0.5-p)*2*dx;
-    f.style.transform=`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z}px) rotate(${f.dataset.rot})`;
+    /* sway: a gentle S-curve drift + slight tilt change, phase-shifted per photo
+       so they float like loose paper instead of moving in lockstep */
+    const x=(0.5-p)*2*dx + Math.sin(p*Math.PI*2.2+phase)*9*d;
+    const tilt=(+f.dataset.rotBase) + Math.sin(p*Math.PI*2+phase)*2.2;
+    /* depth breathing: swell slightly near the middle of the screen, ease off at the edges */
+    const closeness=Math.max(0, 1-Math.abs(centers[i]-midY)/midY);
+    const s=(0.97+closeness*0.09).toFixed(3);
+    f.style.transform=`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z}px) rotate(${tilt.toFixed(2)}deg) scale(${s})`;
   });
 }
 if(noteEl && gfloats.length && !matchMedia('(prefers-reduced-motion: reduce)').matches){
