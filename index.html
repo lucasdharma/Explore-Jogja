@@ -290,6 +290,48 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .footer .fmark{margin-top:40px; font-family:var(--serif); font-size:22px; letter-spacing:.42em; padding-left:.42em; color:var(--ink)}
 @media(max-width:760px){ .footer .meta{flex-direction:column; gap:34px} .footer .meta div{border-right:0; padding:0} }
 
+/* ===== WELCOME (first-visit name capture) ===== */
+.welcome{position:fixed; inset:0; z-index:3000; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:rgba(32,28,36,.55); backdrop-filter:blur(3px); opacity:1; transition:opacity .45s ease}
+.welcome[hidden]{display:none}   /* the class display would otherwise beat the hidden attribute */
+.welcome.leaving{opacity:0; pointer-events:none}
+.welcome-card{background:var(--paper); border:1px solid var(--line-2); max-width:430px; width:100%; padding:40px 36px 32px; text-align:center; box-shadow:0 30px 80px rgba(20,18,24,.35)}
+.welcome-card .eyebrow{color:var(--muted)}
+.welcome-card h2{font-family:var(--serif); font-weight:300; font-size:30px; margin-top:14px}
+.welcome-card p{margin-top:14px; font-size:14px; line-height:1.7; color:var(--ink-2)}
+.welcome-card input{display:block; width:100%; margin-top:22px; padding:14px 16px; font-family:var(--sans); font-size:16px; color:var(--ink);
+  background:var(--white); border:1px solid var(--line-2); border-radius:0; text-align:center}
+.welcome-card input:focus{outline:1px solid var(--ink); outline-offset:2px}
+.welcome-go{display:block; width:100%; margin-top:14px; min-height:48px; padding:13px 20px; cursor:pointer;
+  font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
+  background:var(--ink); color:var(--surface); border:1px solid var(--ink)}
+.welcome-go:hover{background:var(--ink-2)}
+.welcome-skip{display:inline-block; margin-top:16px; background:none; border:0; cursor:pointer; font-family:var(--sans); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); text-decoration:underline; text-underline-offset:4px; min-height:44px}
+.welcome-skip:hover{color:var(--ink)}
+
+/* ===== RECOMMEND ===== */
+.recommend{padding:0 0 var(--section-gap); }
+.rec-inner{max-width:640px; margin:0 auto; text-align:center}
+.rec-inner .eyebrow{color:var(--muted)}
+.rec-inner h2{margin-top:18px; font-size:clamp(30px,4.4vw,48px); font-weight:300}
+.rec-inner .lede{margin-top:20px}
+.rec-form{margin-top:44px; text-align:left}
+.rec-field{margin-bottom:22px}
+.rec-field label{display:block; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:9px}
+.rec-field input,.rec-field textarea{display:block; width:100%; padding:14px 16px; font-family:var(--sans); font-weight:300; font-size:16px; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line-2); border-radius:0; resize:vertical}
+.rec-field input:focus,.rec-field textarea:focus{outline:1px solid var(--ink); outline-offset:2px}
+.rec-error{display:none; margin-top:7px; font-size:12.5px; color:#8C3B2E}
+.rec-field.invalid .rec-error{display:block}
+.rec-field.invalid input,.rec-field.invalid textarea{border-color:#8C3B2E}
+.rec-submit{display:inline-flex; align-items:center; min-height:48px; padding:14px 30px; cursor:pointer;
+  font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
+  background:var(--ink); color:var(--surface); border:1px solid var(--ink); transition:background .3s}
+.rec-submit:hover{background:var(--ink-2)}
+.rec-status{margin-top:22px; font-size:14.5px; line-height:1.7; color:var(--ink-2)}
+.rec-status .link-u{margin-top:10px}
+.cards-cta{margin-top:34px; text-align:center}
+
 .skip-link{position:absolute; left:-999px; top:0; z-index:2000; background:var(--ink); color:var(--surface); padding:14px 22px; font-family:var(--sans); font-size:12px; letter-spacing:.15em; text-transform:uppercase; text-decoration:none}
 .skip-link:focus{left:16px; top:16px}
 
@@ -489,11 +531,55 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
       <span class="hint">Drag to browse &rarr;</span>
     </div>
     <div class="cards" id="cards" aria-label="Places" aria-live="polite"></div>
+    <div class="cards-cta">
+      <a class="link-u" href="#recommend">Know a place we missed? Tell us <span>&rarr;</span></a>
+    </div>
   </div>
 </main>
 
+<section class="recommend" id="recommend">
+  <div class="wrap">
+    <div class="rec-inner reveal">
+      <span class="eyebrow">A friend's recommendation</span>
+      <h2>Know somewhere we missed?</h2>
+      <p class="lede">Got other recommendations that we may have missed? Tell us the places that other guests — or we — need to try, and why we need to try them. Feel free to add below.</p>
+      <form id="rec-form" class="rec-form" novalidate>
+        <div class="rec-field" id="f-by">
+          <label for="rec-by">Your name</label>
+          <input id="rec-by" name="by" type="text" autocomplete="name" />
+          <p class="rec-error">Tell us who you are, so we know who to thank.</p>
+        </div>
+        <div class="rec-field" id="f-place">
+          <label for="rec-place">The place</label>
+          <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…" />
+          <p class="rec-error">What's the place called?</p>
+        </div>
+        <div class="rec-field" id="f-why">
+          <label for="rec-why">Why do we need to try it?</label>
+          <textarea id="rec-why" name="why" rows="4" placeholder="What should we order? What makes it special?"></textarea>
+          <p class="rec-error">Give us a line on why it's worth the trip.</p>
+        </div>
+        <button type="submit" class="rec-submit">Add your recommendation</button>
+        <p class="rec-status" id="rec-status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
 <!-- Mobile-only bottom sheet for a selected place (populated by JS) -->
 <div class="place-sheet" id="place-sheet" role="dialog" aria-modal="false" aria-label="Place details" hidden></div>
+
+<!-- First-visit welcome: just a name, no login (shown by JS when no name is stored) -->
+<div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" hidden>
+  <div class="welcome-card">
+    <span class="eyebrow">Selamat datang</span>
+    <h2 id="welcome-title">Tell us who's wandering</h2>
+    <p>No login, no fuss — just your name, so the guide knows you next time and we know who to thank when you point us somewhere new.</p>
+    <input id="welcome-name" type="text" autocomplete="name" placeholder="Your name" />
+    <button type="button" class="welcome-go" id="welcome-go">Come on in</button>
+    <button type="button" class="welcome-skip" id="welcome-skip">I'd rather stay anonymous</button>
+  </div>
+</div>
 
 <footer class="footer" id="details">
   <div class="wrap reveal">
@@ -626,9 +712,34 @@ const CATS = {
   slowbar: { label:"Slow Bar", color:"#6E4A5E", active:"#5C3B49",
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.2h15L12 13.6Z"/><path d="M12 13.6V19"/><path d="M8.3 19h7.4"/></svg>` },
   food:    { label:"Foodies",  color:"#5F7350", active:"#4B5C3F",
-    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.3 3.2v5.3M8.6 3.2v5.3M10.9 3.2v5.3M8.6 8.5V21"/><path d="M16.3 3.2c-1.7 1.8-1.7 4.6 0 6.4V21"/></svg>` }
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.3 3.2v5.3M8.6 3.2v5.3M10.9 3.2v5.3M8.6 8.5V21"/><path d="M16.3 3.2c-1.7 1.8-1.7 4.6 0 6.4V21"/></svg>` },
+  friends: { label:"From Friends", color:"#5B7C99", active:"#48627A",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C7.7 16.1 4.7 13 4.7 9.9 4.7 7.5 6.5 5.7 8.7 5.7c1.3 0 2.5.6 3.3 1.7.8-1.1 2-1.7 3.3-1.7 2.2 0 4 1.8 4 4.2 0 3.1-3 6.2-7.3 9.6Z"/></svg>` }
 };
-const ORDER = ["all","coffee","slowbar","food"];
+const ORDER = ["all","coffee","slowbar","food","friends"];
+
+/* guest identity + their recommendations, remembered on this device */
+const store = {
+  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
+  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
+  get name(){ return this.read('oy_name',''); },
+  set name(v){ this.write('oy_name', v); },
+  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
+  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
+  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
+  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
+};
+
+/* merged data: curated PLACES + this guest's own recommendations */
+let ALL = [];
+function refreshAll(){
+  ALL = PLACES.concat(store.recs.map(r => ({
+    category:'friends', name:r.place, area: r.by ? `by ${r.by}` : 'by a friend',
+    coords:r.coords || null, blurb:r.why, story:r.why,
+    note:`A tip from ${r.by || 'a friend'} — terima kasih!`
+  })));
+}
+refreshAll();
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
 function gradFor(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0; const g=GRADS[h%GRADS.length]; return `linear-gradient(150deg,${g[0]},${g[1]})`; }
 
@@ -652,8 +763,13 @@ const highlightEl=document.createElement('span');
 highlightEl.className='tab-highlight'; highlightEl.setAttribute('aria-hidden','true');
 switchEl.appendChild(highlightEl);
 
+const countFor = key => key==='all' ? ALL.length : ALL.filter(p=>p.category===key).length;
+function updateTabCounts(){
+  [...switchEl.querySelectorAll('.tab')].forEach(b=>{ b.querySelector('.num').textContent = countFor(b.dataset.cat); });
+  requestAnimationFrame(moveHighlight);   /* counts can change tab widths */
+}
 ORDER.forEach((key,i)=>{
-  const c=CATS[key], n = key==='all' ? PLACES.length : PLACES.filter(p=>p.category===key).length;
+  const c=CATS[key], n = countFor(key);
   const btn=document.createElement('button');
   btn.className='tab'; btn.dataset.cat=key; btn.setAttribute('role','tab'); btn.setAttribute('aria-selected', i===0?'true':'false');
   btn.setAttribute('aria-controls','cards');
@@ -672,7 +788,7 @@ function moveHighlight(){
 }
 requestAnimationFrame(moveHighlight);
 
-const placesFor = cat => PLACES.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
+const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
 const pinFor  = idx => { const m=markers.find(x=>x.idx===idx); return m? m.el : null; };
 const lngLat  = p => [p.coords[1], p.coords[0]];   /* MapLibre uses [lng, lat] */
@@ -758,7 +874,7 @@ function renderMarkers(cat){
   legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
   if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
   markers.forEach(m=>m.marker.remove()); markers=[];
-  list.forEach(p=>{
+  list.filter(p=>p.coords).forEach(p=>{
     const el=document.createElement('div');
     el.className='pin';
     el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label', `Show ${p.name} on the map`);
@@ -771,9 +887,10 @@ function renderMarkers(cat){
     const marker=new maplibregl.Marker({element:el, anchor:'center'}).setLngLat(lngLat(p)).addTo(map);
     markers.push({idx:p._i, el, marker});
   });
-  if(list.length){
+  const locs=list.filter(p=>p.coords);
+  if(locs.length){
     const b=new maplibregl.LngLatBounds();
-    list.forEach(p=>b.extend(lngLat(p)));
+    locs.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
   }
   requestAnimationFrame(()=>markers.forEach(m=>m.el.classList.add('show')));
@@ -839,17 +956,19 @@ sheetEl.addEventListener('touchend', ()=>{
 
 function focusPlace(idx, fromCard){
   setActive(idx);
-  const p=PLACES[idx];
+  const p=ALL[idx];
   const mobile=mqMobile.matches;
   ensureMap(()=>{
-    map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
+    if(p.coords) map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
     if(popup){ popup.remove(); popup=null; }
     if(mobile){
       openSheet(p);
     } else {
       closeSheet();
+      /* a friend's tip may have no pin yet — anchor its popup at the map centre */
+      const anchor = p.coords ? lngLat(p) : map.getCenter();
       popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'none', offset:18})
-        .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
+        .setLngLat(anchor).setHTML(popupHtml(p)).addTo(map);
     }
   });
   /* Selecting a place on the map shows its detail only — it no longer scrolls the
@@ -924,6 +1043,93 @@ function ensureMap(cb){
 const mapObserver=new IntersectionObserver(entries=>{
   entries.forEach(entry=>{ if(entry.isIntersecting) ensureMap(()=>{}); });
 },{rootMargin:'600px 0px'});
+
+/* ---- guest identity: ask once, remember, greet on return ---- */
+const welcomeEl=document.getElementById('welcome');
+const welcomeInput=document.getElementById('welcome-name');
+const heroEyebrow=document.querySelector('.hero-content .eyebrow');
+const recByInput=document.getElementById('rec-by');
+
+function personalize(){
+  const n=store.name;
+  if(!n) return;
+  heroEyebrow.textContent=`A guide for ${n}`;
+  if(!recByInput.value) recByInput.value=n;
+}
+function closeWelcome(){
+  welcomeEl.classList.add('leaving');
+  setTimeout(()=>{ welcomeEl.hidden=true; }, 500);
+}
+function acceptWelcome(){
+  const n=welcomeInput.value.trim();
+  if(n){ store.name=n; personalize(); }
+  else store.skippedWelcome=true;
+  closeWelcome();
+}
+if(!store.name && !store.skippedWelcome){
+  welcomeEl.hidden=false;
+  document.getElementById('welcome-go').addEventListener('click', acceptWelcome);
+  document.getElementById('welcome-skip').addEventListener('click', ()=>{ store.skippedWelcome=true; closeWelcome(); });
+  welcomeInput.addEventListener('keydown', e=>{ if(e.key==='Enter') acceptWelcome(); });
+  setTimeout(()=>welcomeInput.focus(), 400);
+} else {
+  personalize();
+}
+
+/* ---- a friend's recommendation: save locally, pin via geocoding, email to us ---- */
+const recForm=document.getElementById('rec-form');
+const recStatus=document.getElementById('rec-status');
+
+function geocodeRec(rec){
+  /* best effort: find the place on the map so it gets a real pin. Guests won't
+     know coordinates, so we ask OpenStreetMap's free geocoder and sanity-check
+     the hit is actually around Yogyakarta before pinning it. */
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(rec.place+', Yogyakarta, Indonesia')}`)
+    .then(r=>r.ok?r.json():[])
+    .then(hits=>{
+      if(!hits.length) return;
+      const lat=+hits[0].lat, lon=+hits[0].lon;
+      if(lat<-8.4||lat>-7.2||lon<110.0||lon>110.9) return;
+      const recs=store.recs;
+      const mine=recs.find(x=>x.t===rec.t);
+      if(!mine) return;
+      mine.coords=[lat,lon];
+      store.recs=recs;
+      refreshAll();
+      if(active==='friends'||active==='all') renderMarkers(active);
+    })
+    .catch(()=>{});
+}
+
+recForm.addEventListener('submit', e=>{
+  e.preventDefault();
+  const by=document.getElementById('rec-by').value.trim();
+  const place=document.getElementById('rec-place').value.trim();
+  const why=document.getElementById('rec-why').value.trim();
+  let firstInvalid=null;
+  [['f-by',by],['f-place',place],['f-why',why]].forEach(([id,val])=>{
+    const field=document.getElementById(id);
+    field.classList.toggle('invalid', !val);
+    if(!val && !firstInvalid) firstInvalid=field.querySelector('input,textarea');
+  });
+  if(firstInvalid){ firstInvalid.focus(); return; }
+
+  if(by && !store.name){ store.name=by; personalize(); }
+  const rec={ t:Date.now(), by, place, why, coords:null };
+  store.recs=store.recs.concat([rec]);
+  refreshAll();
+  updateTabCounts();
+  if(active==='friends'||active==='all'){ renderCards(active); renderMarkers(active); }
+  geocodeRec(rec);
+
+  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${by}`);
+  const body=encodeURIComponent(`From: ${by}\nPlace: ${place}\nWhy we should try it:\n${why}`);
+  recStatus.innerHTML=`Terima kasih, ${by}! Your tip is saved on this device and now lives under <b>From Friends</b> on the map.<br>`+
+    `<a class="link-u" href="mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
+    `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  recForm.reset();
+  if(store.name) recByInput.value=store.name;
+});
 
 addEventListener('load', ()=>{
   renderCards(active);
