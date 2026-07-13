@@ -17,6 +17,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Our Yogyakarta" />
 
+<link rel="preload" as="image" href="assets/hero/merapi-2048.jpg" media="(min-width: 761px)" fetchpriority="high" />
+<link rel="preload" as="image" href="assets/hero/merapi-1200.jpg" media="(max-width: 760px)" fetchpriority="high" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -77,6 +79,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     linear-gradient(180deg, #2f3550 0%, #45435c 24%, #6d5a62 44%, #a2766a 58%, #d29a74 68%, #ecc498 76%, #f3d7ac 82%)}
 .hero-photo{position:absolute; inset:0; background-image:var(--hero-img); background-size:cover; background-position:center; transform:scale(1.02); animation:kb 26s ease-in-out infinite alternate}
 @keyframes kb{to{transform:scale(1.09)}}
+/* the living Merapi scene: a WebGL canvas painting the photo with drifting
+   clouds, wind in the trees and pointer/tilt parallax. It fades in over the
+   illustrated scene once the texture is ready; if WebGL is unavailable the
+   CSS layers below take over. */
+.hero-canvas{position:absolute; inset:0; width:100%; height:100%; opacity:0; transition:opacity 1.6s ease}
+.hero-canvas.on{opacity:1}
+.hero.photo-hero .hero-flora{display:none}
+.hero.photo-hero .hero-scene{animation:none; opacity:0; visibility:hidden; transition:opacity 1.2s ease .6s, visibility 0s 1.8s}
+.hero-clouds{position:absolute; inset:0; overflow:hidden; pointer-events:none}
+.hero-cloud{position:absolute; width:44vw; height:15vw; min-width:280px; min-height:96px; border-radius:50%;
+  background:radial-gradient(ellipse at 50% 55%, rgba(243,240,235,.5) 0%, rgba(243,240,235,0) 68%);
+  filter:blur(12px); animation:cloud-x linear infinite}
+@keyframes cloud-x{from{transform:translateX(-70vw)} to{transform:translateX(170vw)}}
 .hero-ridge{position:absolute; left:0; right:0; bottom:0; width:100%; height:66%; display:block}
 .hero-scrim{position:absolute; inset:0; background:linear-gradient(180deg, rgba(20,18,24,.28) 0%, rgba(20,18,24,0) 30%, rgba(20,18,24,0) 55%, rgba(20,18,24,.55) 100%)}
 .hero-content{position:relative; z-index:3; color:#F5F1EA; padding-bottom:clamp(48px,9vh,110px); width:100%}
@@ -418,6 +433,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     </svg>
   </div>
   <div class="hero-photo" aria-hidden="true"></div>
+  <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
   <div class="hero-scrim" aria-hidden="true"></div>
   <!-- blossom branch with a perched bird, in the spirit of the reference painting -->
   <svg class="hero-flora" viewBox="0 0 360 330" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -599,10 +615,251 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 <script>
 /* ============================================================
    EDIT HERE — names in the nav/note/footer markup above; date in
-   the footer. A real hero photo: set --hero-img in :root to
-   url('your-photo.jpg'). Each place: category + coords [lat,lng].
+   the footer. The hero photo lives at assets/hero/merapi-2048.jpg
+   (desktop) and assets/hero/merapi-1200.jpg (phones) — replace
+   those two files to swap the scene; the composition constants
+   are in HERO_TUNE below. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
+
+/* ---- Merapi hero: a living 2.5-D scene. One WebGL pass samples the
+   photograph and adds procedurally drifting clouds around the summit,
+   wind moving through the foliage, and depth parallax that follows the
+   mouse on desktop and tilt/touch on phones. No libraries; if WebGL is
+   missing we fall back to the photo with CSS clouds, and with reduced
+   motion preferred the photo is simply shown still. ---- */
+const HERO_TUNE = {
+  focus:[0.45, 0.42],      /* image point (x,y from top-left) kept centred when cropping */
+  cloudBandA:[0.16, 0.66], /* y-range wrapping the summit and upper slopes */
+  cloudBandB:[0.02, 0.44], /* y-range of the high thin veils */
+  mistBand:[0.46, 0.72],   /* y-range of treeline mist */
+  foliageFromY:0.56,       /* wind + parallax ramp up below this line */
+  treeFromX:0.70           /* the big near tree along the right edge */
+};
+
+(function heroScene(){
+  const hero = document.querySelector('.hero');
+  const canvas = document.getElementById('hero-canvas');
+  if(!hero || !canvas) return;
+
+  const small = matchMedia('(max-width:760px)').matches;
+  const SRC = small ? 'assets/hero/merapi-1200.jpg' : 'assets/hero/merapi-2048.jpg';
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const photoEl = hero.querySelector('.hero-photo');
+
+  function cssFallback(withClouds){
+    canvas.remove();
+    photoEl.style.backgroundImage = `url('${SRC}')`;
+    hero.classList.add('photo-hero');
+    if(withClouds && !still){
+      const holder = document.createElement('div');
+      holder.className = 'hero-clouds'; holder.setAttribute('aria-hidden','true');
+      [[9,58,-6],[24,74,-32],[16,90,-58]].forEach(([top,dur,delay])=>{
+        const c = document.createElement('div'); c.className = 'hero-cloud';
+        c.style.top = top+'%'; c.style.animationDuration = dur+'s'; c.style.animationDelay = delay+'s';
+        holder.appendChild(c);
+      });
+      photoEl.after(holder);
+    }
+  }
+
+  if(still){ cssFallback(false); return; }
+
+  const gl = canvas.getContext('webgl', {alpha:false, antialias:false, depth:false, stencil:false, powerPreference:'low-power'});
+  if(!gl){ cssFallback(true); return; }
+
+  const FRAG = `
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res, u_off, u_scale, u_par;
+uniform float u_time;
+
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for(int i = 0; i < 4; i++){ v += a * vnoise(p); p = p * 2.03 + vec2(19.7, 7.3); a *= 0.5; }
+  return v;
+}
+
+void main(){
+  /* screen uv with y = 0 at the top, then the cover-fit window into the
+     photo, breathing very slowly like a long exhale */
+  vec2 suv = vec2(gl_FragCoord.x / u_res.x, 1.0 - gl_FragCoord.y / u_res.y);
+  float breathe = 1.0 + 0.012 * sin(u_time * 0.05);
+  vec2 uv = u_off + (0.5 + (suv - 0.5) / breathe) * u_scale;
+
+  /* depth: 0 = sky and summit, 1 = the near foliage */
+  float tree = smoothstep(${f(HERO_TUNE.treeFromX)}, ${f(HERO_TUNE.treeFromX + 0.14)}, uv.x) * (1.0 - smoothstep(0.62, 0.82, uv.y));
+  float depth = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.95, uv.y), tree * 0.9);
+
+  /* parallax: the foreground leans away from the pointer, the sky drifts
+     gently with it — a window into the valley rather than a flat print */
+  vec2 poff = u_par * (0.30 - depth) * vec2(0.016, 0.010);
+
+  /* wind: slow gusts plus a fine leaf flutter, only in the foliage,
+     patchy so the canopies shiver rather than the hillside sliding */
+  float windm = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.80, uv.y), tree);
+  float patch = 0.55 + 0.45 * vnoise(uv * vec2(9.0, 7.0));
+  float gust = fbm(vec2(uv.x * 2.2 - u_time * 0.24, uv.y * 2.0)) - 0.47;
+  float flutter = sin(u_time * 2.4 + uv.x * 34.0 + uv.y * 27.0) * 0.30;
+  vec2 woff = vec2(gust * 1.5 + flutter, gust * 0.35) * 0.0038 * windm * patch * (0.35 + 0.65 * depth);
+
+  vec3 col = texture2D(u_tex, uv + poff + woff).rgb;
+
+  /* cloud sheet A — soft cumulus crossing the frame and wrapping the
+     cone, lit from above, shaded on their undersides */
+  vec2 ca = vec2((uv.x - u_time * 0.016 - u_par.x * 0.022) * 2.3, (uv.y - u_par.y * 0.014) * 5.2);
+  float n1 = fbm(ca);
+  float bandA = smoothstep(${f(HERO_TUNE.cloudBandA[0])}, ${f(HERO_TUNE.cloudBandA[0] + 0.14)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.cloudBandA[1] - 0.16)}, ${f(HERO_TUNE.cloudBandA[1])}, uv.y));
+  float a1 = smoothstep(0.55, 0.82, n1) * bandA;
+  float lit = smoothstep(0.70, 0.35, fbm(ca + vec2(0.0, -0.20)));
+  vec3 cloudA = mix(vec3(0.78, 0.81, 0.86), vec3(0.99, 0.985, 0.97), lit);
+  col = mix(col, cloudA, a1 * 0.88);
+
+  /* cloud sheet B — thinner, higher veils moving on their own wind */
+  float n2 = fbm(vec2((uv.x - u_time * 0.026 - 0.37 - u_par.x * 0.030) * 3.4, (uv.y - u_par.y * 0.018) * 7.5));
+  float bandB = smoothstep(${f(HERO_TUNE.cloudBandB[0])}, ${f(HERO_TUNE.cloudBandB[0] + 0.08)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.cloudBandB[1] - 0.14)}, ${f(HERO_TUNE.cloudBandB[1])}, uv.y));
+  col = mix(col, vec3(0.965, 0.975, 0.985), smoothstep(0.60, 0.85, n2) * bandB * 0.55);
+
+  /* a breath of mist along the treeline */
+  float n3 = fbm(vec2((uv.x - u_time * 0.008) * 2.6, uv.y * 9.0));
+  float bandM = smoothstep(${f(HERO_TUNE.mistBand[0])}, ${f(HERO_TUNE.mistBand[0] + 0.09)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.mistBand[1] - 0.10)}, ${f(HERO_TUNE.mistBand[1])}, uv.y));
+  col = mix(col, vec3(0.88, 0.90, 0.93), smoothstep(0.45, 0.85, n3) * bandM * 0.22);
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+  function f(x){ return x.toFixed(4); }
+
+  function shader(type, src){
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+  }
+  const vs = shader(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }');
+  const fs = shader(gl.FRAGMENT_SHADER, FRAG);
+  if(!vs || !fs){ cssFallback(true); return; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ cssFallback(true); return; }
+  gl.useProgram(prog);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  const locP = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(locP);
+  gl.vertexAttribPointer(locP, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {};
+  ['u_res','u_off','u_scale','u_par','u_time','u_tex'].forEach(n=>{ U[n] = gl.getUniformLocation(prog, n); });
+
+  const img = new Image();
+  img.decoding = 'async';
+  img.onerror = ()=>{ canvas.remove(); }; /* keep the illustrated scene */
+  img.onload = start;
+  img.src = SRC;
+
+  let running = false, visible = true, raf = 0;
+  let px = 0, py = 0, tx = 0, ty = 0, last = 0;
+  const t0 = performance.now();
+
+  function fit(){
+    const dpr = Math.min(devicePixelRatio || 1, 1.75);
+    canvas.width = Math.max(1, Math.round(hero.clientWidth * dpr));
+    canvas.height = Math.max(1, Math.round(hero.clientHeight * dpr));
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    const ZOOM = 1.07, M = 0.022;
+    const s = Math.max(canvas.width / img.width, canvas.height / img.height) * ZOOM;
+    const vx = canvas.width / (img.width * s), vy = canvas.height / (img.height * s);
+    const cx = Math.min(Math.max(HERO_TUNE.focus[0], vx / 2 + M), 1 - vx / 2 - M);
+    const cy = Math.min(Math.max(HERO_TUNE.focus[1], vy / 2 + M), 1 - vy / 2 - M);
+    gl.uniform2f(U.u_res, canvas.width, canvas.height);
+    gl.uniform2f(U.u_off, cx - vx / 2, cy - vy / 2);
+    gl.uniform2f(U.u_scale, vx, vy);
+  }
+
+  function frame(now){
+    raf = 0;
+    if(!running || !visible) return;
+    const dt = Math.min((now - last) / 1000, 0.1); last = now;
+    /* pointer eases toward its target; a slow figure-eight keeps the
+       scene alive when nobody is touching it */
+    const t = (now - t0) / 1000;
+    const ix = Math.sin(t * 0.11) * 0.22, iy = Math.cos(t * 0.07) * 0.14;
+    const k = 1 - Math.exp(-dt * 2.4);
+    px += (Math.max(-1, Math.min(1, tx + ix)) - px) * k;
+    py += (Math.max(-1, Math.min(1, ty + iy)) - py) * k;
+    gl.uniform2f(U.u_par, px, py);
+    gl.uniform1f(U.u_time, t);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    raf = requestAnimationFrame(frame);
+  }
+  function wake(){ if(running && visible && !raf){ last = performance.now(); raf = requestAnimationFrame(frame); } }
+
+  function start(){
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+    gl.uniform1i(U.u_tex, 0);
+    fit();
+    running = true; wake();
+    canvas.classList.add('on');
+    hero.classList.add('photo-hero');
+  }
+
+  addEventListener('resize', ()=>{ if(running) fit(); }, {passive:true});
+  let onScreen = true;
+  document.addEventListener('visibilitychange', ()=>{ visible = onScreen && !document.hidden; wake(); });
+  new IntersectionObserver(es=>{
+    es.forEach(e=>{ onScreen = e.isIntersecting; visible = onScreen && !document.hidden; wake(); });
+  }).observe(hero);
+
+  /* desktop: the scene follows the mouse */
+  addEventListener('mousemove', e=>{
+    tx = (e.clientX / innerWidth) * 2 - 1;
+    ty = (e.clientY / innerHeight) * 2 - 1;
+  }, {passive:true});
+
+  /* phones: follow a finger moving over the hero… */
+  hero.addEventListener('touchmove', e=>{
+    const t = e.touches[0]; if(!t) return;
+    tx = (t.clientX / innerWidth) * 2 - 1;
+    ty = (t.clientY / innerHeight) * 2 - 1;
+  }, {passive:true});
+
+  /* …and the tilt of the device, when the platform allows it */
+  function tilt(e){
+    if(e.gamma == null || e.beta == null) return;
+    if(baseBeta == null) baseBeta = e.beta;
+    tx = Math.max(-1, Math.min(1, e.gamma / 22));
+    ty = Math.max(-1, Math.min(1, (e.beta - baseBeta) / 26));
+  }
+  let baseBeta = null;
+  if(typeof DeviceOrientationEvent !== 'undefined'){
+    if(typeof DeviceOrientationEvent.requestPermission === 'function'){
+      /* iOS wants a gesture first; ask quietly on the first touch */
+      hero.addEventListener('touchend', function ask(){
+        hero.removeEventListener('touchend', ask);
+        DeviceOrientationEvent.requestPermission()
+          .then(st=>{ if(st === 'granted') addEventListener('deviceorientation', tilt, {passive:true}); })
+          .catch(()=>{});
+      }, {passive:true});
+    } else {
+      addEventListener('deviceorientation', tilt, {passive:true});
+    }
+  }
+
+  canvas.addEventListener('webglcontextlost', ()=>{ running = false; cssFallback(true); }, false);
+})();
 const PLACES = [
   /* COFFEE */
   { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203],
