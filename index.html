@@ -19,6 +19,7 @@
 
 <link rel="preload" as="image" href="assets/hero/merapi-2048.jpg" media="(min-width: 761px)" fetchpriority="high" />
 <link rel="preload" as="image" href="assets/hero/merapi-1200.jpg" media="(max-width: 760px)" fetchpriority="high" />
+<link rel="preload" as="image" href="assets/hero/merapi-flow.jpg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -616,25 +617,31 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* ============================================================
    EDIT HERE — names in the nav/note/footer markup above; date in
    the footer. The hero photo lives at assets/hero/merapi-2048.jpg
-   (desktop) and assets/hero/merapi-1200.jpg (phones) — replace
-   those two files to swap the scene; the composition constants
-   are in HERO_TUNE below. Each place: category + coords [lat,lng].
+   (desktop) and assets/hero/merapi-1200.jpg (phones); the grayscale
+   assets/hero/merapi-flow.jpg marks which of its pixels are cloud
+   and may drift (white = moves, black = pinned still) and must be
+   rebuilt if the photo changes. Composition constants are in
+   HERO_TUNE below. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
 
 /* ---- Merapi hero: a living 2.5-D scene. One WebGL pass samples the
-   photograph and adds procedurally drifting clouds around the summit,
-   wind moving through the foliage, and depth parallax that follows the
-   mouse on desktop and tilt/touch on phones. No libraries; if WebGL is
-   missing we fall back to the photo with CSS clouds, and with reduced
-   motion preferred the photo is simply shown still. ---- */
+   photograph and sets the photo's own clouds in motion — a feathered
+   flow mask (assets/hero/merapi-flow.jpg) marks the cloud and mist
+   pixels, which are advected downwind with two half-period samples
+   crossfading so the drift loops seamlessly. Wind moves through the
+   foliage, and depth parallax follows the mouse on desktop and
+   tilt/touch on phones. No libraries; if WebGL is missing we fall back
+   to the photo with CSS clouds, and with reduced motion preferred the
+   photo is simply shown still. ---- */
 const HERO_TUNE = {
-  focus:[0.45, 0.42],      /* image point (x,y from top-left) kept centred when cropping */
-  cloudBandA:[0.16, 0.66], /* y-range wrapping the summit and upper slopes */
-  cloudBandB:[0.02, 0.44], /* y-range of the high thin veils */
-  mistBand:[0.46, 0.72],   /* y-range of treeline mist */
-  foliageFromY:0.56,       /* wind + parallax ramp up below this line */
-  treeFromX:0.70           /* the big near tree along the right edge */
+  focus:[0.50, 0.42],      /* image point (x,y from top-left) kept centred when cropping */
+  foliageFromY:0.68,       /* the forest ridge — wind + parallax ramp up below this line */
+  twigRightX:0.84,         /* the blurred golden plants along the right edge */
+  twigLeftX:0.16,          /* the grass blades in the lower-left corner */
+  flowDir:[-0.94, -0.06],  /* which way the clouds travel (they stream left off the summit) */
+  flowDist:0.032,          /* how far a cloud drifts per cycle, in image widths */
+  flowPeriod:10.0          /* seconds per crossfade cycle */
 };
 
 (function heroScene(){
@@ -670,7 +677,7 @@ const HERO_TUNE = {
 
   const FRAG = `
 precision highp float;
-uniform sampler2D u_tex;
+uniform sampler2D u_tex, u_mask;
 uniform vec2 u_res, u_off, u_scale, u_par;
 uniform float u_time;
 
@@ -695,42 +702,39 @@ void main(){
   vec2 uv = u_off + (0.5 + (suv - 0.5) / breathe) * u_scale;
 
   /* depth: 0 = sky and summit, 1 = the near foliage */
-  float tree = smoothstep(${f(HERO_TUNE.treeFromX)}, ${f(HERO_TUNE.treeFromX + 0.14)}, uv.x) * (1.0 - smoothstep(0.62, 0.82, uv.y));
-  float depth = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.95, uv.y), tree * 0.9);
+  float twigR = smoothstep(${f(HERO_TUNE.twigRightX)}, ${f(HERO_TUNE.twigRightX + 0.10)}, uv.x) * smoothstep(0.18, 0.32, uv.y);
+  float twigL = (1.0 - smoothstep(${f(HERO_TUNE.twigLeftX - 0.10)}, ${f(HERO_TUNE.twigLeftX)}, uv.x)) * smoothstep(0.56, 0.72, uv.y);
+  float twigs = max(twigR, twigL);
+  float depth = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.98, uv.y), twigs * 0.95);
 
   /* parallax: the foreground leans away from the pointer, the sky drifts
      gently with it — a window into the valley rather than a flat print */
   vec2 poff = u_par * (0.30 - depth) * vec2(0.016, 0.010);
 
-  /* wind: slow gusts plus a fine leaf flutter, only in the foliage,
-     patchy so the canopies shiver rather than the hillside sliding */
-  float windm = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.80, uv.y), tree);
+  /* wind: slow gusts plus a fine leaf flutter — strongest in the blurred
+     near plants, gentler across the forest, patchy so the canopies
+     shiver rather than the hillside sliding */
+  float windm = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.88, uv.y) * 0.7, twigs);
   float patch = 0.55 + 0.45 * vnoise(uv * vec2(9.0, 7.0));
   float gust = fbm(vec2(uv.x * 2.2 - u_time * 0.24, uv.y * 2.0)) - 0.47;
   float flutter = sin(u_time * 2.4 + uv.x * 34.0 + uv.y * 27.0) * 0.30;
-  vec2 woff = vec2(gust * 1.5 + flutter, gust * 0.35) * 0.0038 * windm * patch * (0.35 + 0.65 * depth);
+  vec2 woff = vec2(gust * 1.5 + flutter, gust * 0.35) * 0.0042 * windm * patch * (0.35 + 0.65 * depth);
 
-  vec3 col = texture2D(u_tex, uv + poff + woff).rgb;
-
-  /* cloud sheet A — soft cumulus crossing the frame and wrapping the
-     cone, lit from above, shaded on their undersides */
-  vec2 ca = vec2((uv.x - u_time * 0.016 - u_par.x * 0.022) * 2.3, (uv.y - u_par.y * 0.014) * 5.2);
-  float n1 = fbm(ca);
-  float bandA = smoothstep(${f(HERO_TUNE.cloudBandA[0])}, ${f(HERO_TUNE.cloudBandA[0] + 0.14)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.cloudBandA[1] - 0.16)}, ${f(HERO_TUNE.cloudBandA[1])}, uv.y));
-  float a1 = smoothstep(0.55, 0.82, n1) * bandA;
-  float lit = smoothstep(0.70, 0.35, fbm(ca + vec2(0.0, -0.20)));
-  vec3 cloudA = mix(vec3(0.78, 0.81, 0.86), vec3(0.99, 0.985, 0.97), lit);
-  col = mix(col, cloudA, a1 * 0.88);
-
-  /* cloud sheet B — thinner, higher veils moving on their own wind */
-  float n2 = fbm(vec2((uv.x - u_time * 0.026 - 0.37 - u_par.x * 0.030) * 3.4, (uv.y - u_par.y * 0.018) * 7.5));
-  float bandB = smoothstep(${f(HERO_TUNE.cloudBandB[0])}, ${f(HERO_TUNE.cloudBandB[0] + 0.08)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.cloudBandB[1] - 0.14)}, ${f(HERO_TUNE.cloudBandB[1])}, uv.y));
-  col = mix(col, vec3(0.965, 0.975, 0.985), smoothstep(0.60, 0.85, n2) * bandB * 0.55);
-
-  /* a breath of mist along the treeline */
-  float n3 = fbm(vec2((uv.x - u_time * 0.008) * 2.6, uv.y * 9.0));
-  float bandM = smoothstep(${f(HERO_TUNE.mistBand[0])}, ${f(HERO_TUNE.mistBand[0] + 0.09)}, uv.y) * (1.0 - smoothstep(${f(HERO_TUNE.mistBand[1] - 0.10)}, ${f(HERO_TUNE.mistBand[1])}, uv.y));
-  col = mix(col, vec3(0.88, 0.90, 0.93), smoothstep(0.45, 0.85, n3) * bandM * 0.22);
+  /* the photograph's own clouds, set adrift: the flow mask marks cloud
+     and mist pixels, which slide downwind. Two samples half a cycle
+     apart crossfade, so each one carries weight only near the middle of
+     its travel and the loop never visibly resets. A slow churn breathes
+     through the mask so the drift billows instead of gliding rigidly. */
+  vec2 base = uv + poff + woff;
+  float cm = texture2D(u_mask, uv).r;
+  vec2 fdir = vec2(${f(HERO_TUNE.flowDir[0])}, ${f(HERO_TUNE.flowDir[1])}) * ${f(HERO_TUNE.flowDist)};
+  float ph1 = fract(u_time / ${f(HERO_TUNE.flowPeriod)});
+  float ph2 = fract(ph1 + 0.5);
+  vec2 churn = vec2(fbm(uv * 5.0 + u_time * 0.050) - 0.5,
+                    fbm(uv * 5.0 + vec2(8.3, 2.7) - u_time * 0.045) - 0.5) * 0.014;
+  vec3 s1 = texture2D(u_tex, base + (fdir * (ph1 - 0.5) + churn) * cm).rgb;
+  vec3 s2 = texture2D(u_tex, base + (fdir * (ph2 - 0.5) + churn) * cm).rgb;
+  vec3 col = mix(s1, s2, abs(ph1 * 2.0 - 1.0));
 
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -756,13 +760,30 @@ void main(){
   gl.vertexAttribPointer(locP, 2, gl.FLOAT, false, 0, 0);
 
   const U = {};
-  ['u_res','u_off','u_scale','u_par','u_time','u_tex'].forEach(n=>{ U[n] = gl.getUniformLocation(prog, n); });
+  ['u_res','u_off','u_scale','u_par','u_time','u_tex','u_mask'].forEach(n=>{ U[n] = gl.getUniformLocation(prog, n); });
 
-  const img = new Image();
-  img.decoding = 'async';
+  function upload(unit, source){
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    if(source) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0]));
+  }
+
+  const img = new Image(), maskImg = new Image();
+  img.decoding = maskImg.decoding = 'async';
+  let pending = 2;
+  const arrived = ()=>{ if(--pending === 0) start(); };
+  img.onload = arrived;
   img.onerror = ()=>{ canvas.remove(); }; /* keep the illustrated scene */
-  img.onload = start;
+  /* a missing mask only stills the clouds — the rest of the scene runs */
+  maskImg.onload = arrived;
+  maskImg.onerror = ()=>{ maskImg.failed = true; arrived(); };
   img.src = SRC;
+  maskImg.src = 'assets/hero/merapi-flow.jpg';
 
   let running = false, visible = true, raf = 0;
   let px = 0, py = 0, tx = 0, ty = 0, last = 0;
@@ -802,14 +823,10 @@ void main(){
   function wake(){ if(running && visible && !raf){ last = performance.now(); raf = requestAnimationFrame(frame); } }
 
   function start(){
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+    upload(0, img);
+    upload(1, maskImg.failed ? null : maskImg);
     gl.uniform1i(U.u_tex, 0);
+    gl.uniform1i(U.u_mask, 1);
     fit();
     running = true; wake();
     canvas.classList.add('on');
