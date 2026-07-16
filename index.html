@@ -5,26 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Our Yogyakarta — A Guide for Our Guests</title>
 <meta name="description" content="A quiet, curated guide to the coffee, slow bars and food of Yogyakarta — gathered for the people we love." />
+<meta name="theme-color" content="#F1EDE6" />
+
+<!-- PWA: installable, mobile-first -->
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Our Yogyakarta" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
 
-<!-- MapLibre GL (open-source, no API key needed) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-<script defer src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<!-- MapLibre GL (open-source, no API key needed) is loaded lazily in-script, just before the map scrolls into view -->
 
 <style>
 :root{
   --surface:#F1EDE6; --surface-2:#E9E3D8; --paper:#FAF7F0; --white:#FFFFFF;
-  --ink:#2B2924; --ink-2:#413D36; --muted:#7A756B; --line:#DAD4C7; --line-2:#BFB8A8;
+  --ink:#2B2924; --ink-2:#413D36; --muted:#5E594F; --line:#DAD4C7; --line-2:#BFB8A8;
   --hero-img:none;
   --serif:"Cormorant Garamond", Georgia, serif; --sans:"Jost", system-ui, sans-serif;
   --maxw:1320px; --gutter:64px; --section-gap:150px;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
-body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
 h1,h2,h3{font-family:var(--serif); font-weight:300; margin:0; line-height:1.08}
 p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; display:block}
 :focus-visible{outline:1px solid var(--ink); outline-offset:4px}
@@ -45,13 +55,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .nav a{text-decoration:none; color:#F3EFE8; transition:color .5s}
 .nav-left{font-family:var(--sans); font-size:11px; letter-spacing:.24em; text-transform:uppercase}
 .wordmark{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:var(--serif); font-weight:400; font-size:22px; letter-spacing:.42em; padding-left:.42em; white-space:nowrap}
-.nav-btn{font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid rgba(243,239,232,.5); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
+.nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid rgba(243,239,232,.5); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
 .nav-btn:hover{background:#F3EFE8; color:var(--ink)}
 .nav.solid{background:var(--surface); border-bottom:1px solid var(--line)}
 .nav.solid a{color:var(--ink)}
 .nav.solid .nav-btn{border-color:var(--line-2)}
 .nav.solid .nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
-@media(max-width:760px){ .nav-left{display:none} .wordmark{font-size:18px; letter-spacing:.34em} .nav-btn{padding:10px 18px} }
+@media(max-width:760px){
+  .nav-inner{height:64px}
+  .nav-left{display:none}
+  /* left-align the wordmark in flow so it never collides with the map button */
+  .wordmark{position:static; transform:none; left:auto; top:auto; font-size:15px; letter-spacing:.16em; padding-left:.16em}
+  .nav-btn{padding:9px 14px; font-size:10px; letter-spacing:.14em}
+}
 
 /* ===== HERO ===== */
 .hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end}
@@ -72,13 +88,50 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 @keyframes fade{to{opacity:1; transform:none}}
 .scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:3; color:rgba(245,241,234,.75); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
+/* hero illustration life: slowly drifting clouds + summit plume + blossom branch */
+.cloud-a{animation:drifta 64s ease-in-out infinite alternate}
+.cloud-b{animation:driftb 82s ease-in-out infinite alternate}
+.plume{animation:plumef 18s ease-in-out infinite alternate}
+@keyframes drifta{to{transform:translateX(36px)}}
+@keyframes driftb{to{transform:translateX(-44px)}}
+@keyframes plumef{to{transform:translateX(-14px)}}
+.hero-flora{position:absolute; top:66px; right:0; width:clamp(190px, 26vw, 350px); height:auto; z-index:2; pointer-events:none}
+@media(max-width:760px){ .hero-flora{top:72px; width:52vw; max-width:230px} }
 
-/* ===== NOTE ===== */
-.note{padding:var(--section-gap) 0; text-align:center}
+/* ===== NOTE — the floating gallery =====
+   A tall scroll track with a sticky 100svh stage. The quote stays pinned in the
+   centre while photos drift past at different 3D depths (CSS perspective +
+   scroll-driven transforms in JS), so the pictures move with the scroll wheel. */
+.note{position:relative; height:260vh; padding:0}
+.note-sticky{position:sticky; top:0; height:100svh; overflow:hidden; display:flex; align-items:center; justify-content:center; perspective:1100px}
+.note-quote{position:relative; z-index:2; text-align:center}
 .note .eyebrow{color:var(--muted)}
 .note .rule{width:1px; height:56px; background:var(--line-2); margin:0 auto 40px}
 .note p{font-family:var(--serif); font-weight:300; font-style:italic; font-size:clamp(26px,3.6vw,40px); line-height:1.45; max-width:900px; margin:26px auto 0; color:var(--ink)}
 .note .sign{margin-top:34px; color:var(--muted)}
+.note-floats{position:absolute; inset:0; z-index:1; pointer-events:none; transform-style:preserve-3d}
+.gfloat{position:absolute; left:var(--x); top:var(--y); width:var(--w); margin:0; padding:9px 9px 12px;
+  background:var(--paper); border:1px solid var(--line); box-shadow:0 14px 40px rgba(40,36,30,.18);
+  transform:rotate(var(--rot)); will-change:transform}
+.gfloat.front{z-index:3}
+.gfloat img{width:100%; height:auto; display:block; filter:saturate(.9)}
+.gfloat figcaption{margin-top:8px; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--muted); text-align:center; line-height:1.3}
+@media(max-width:760px){
+  .note{height:210vh}
+  .gfloat{width:calc(var(--w) * .58); padding:6px 6px 8px}
+  .gfloat.front{z-index:1}   /* keep the quote readable: photos always drift behind the text on phones */
+  .gfloat figcaption{font-size:11px; margin-top:5px}
+  .gfloat.hide-m{display:none}
+  /* nudge the two mid-band photos away from the quote's resting position
+     (!important because per-item positions are set as inline style vars) */
+  .note-floats .gfloat:nth-child(3){--y:16% !important}
+  .note-floats .gfloat:nth-child(4){--y:64% !important}
+}
+@media (prefers-reduced-motion: reduce){
+  .note{height:auto; padding:var(--section-gap) 0}
+  .note-sticky{position:static; height:auto; padding:60px 0}
+  .note-floats{display:none}
+}
 
 /* ===== EXPLORE ===== */
 .explore{padding:0 0 var(--section-gap)}
@@ -87,26 +140,58 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .ex-head h2{margin-top:20px; font-size:clamp(34px,5.2vw,60px); font-weight:300}
 .ex-head p{margin:22px auto 0; max-width:560px}
 
-.tabs{display:flex; justify-content:center; flex-wrap:wrap; gap:44px; margin-bottom:44px}
-@media(max-width:760px){ .tabs{gap:26px; justify-content:flex-start; overflow-x:auto; scrollbar-width:none; padding-bottom:4px} .tabs::-webkit-scrollbar{display:none} }
-.tab{position:relative; background:none; border:0; padding:0 0 9px; cursor:pointer; white-space:nowrap;
-  font-family:var(--sans); font-weight:400; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); transition:color .35s}
-.tab .num{font-family:var(--serif); font-style:italic; font-size:13px; letter-spacing:0; margin-left:8px; opacity:.7}
-.tab::after{content:""; position:absolute; left:0; bottom:0; height:1px; width:100%; background:var(--ink); transform:scaleX(0); transform-origin:center; transition:transform .4s cubic-bezier(.4,0,.2,1)}
-.tab:hover{color:var(--ink)} .tab[aria-selected="true"]{color:var(--ink)} .tab[aria-selected="true"]::after{transform:scaleX(1)}
+/* seamless segmented category control — one pill, a sliding colour highlight,
+   floated over the top of the map so filtering never means leaving the map
+   (and stays available in fullscreen) */
+.tabs{position:absolute; z-index:6; top:16px; left:50%; transform:translateX(-50%);
+  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 660px);
+  padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:999px;
+  box-shadow:0 8px 28px rgba(40,36,30,.22);
+  overflow-x:auto; scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+@media(max-width:760px){ .tabs{top:12px; left:12px; right:66px; transform:none; max-width:none} }
+.tab-highlight{position:absolute; top:6px; left:0; height:calc(100% - 12px); width:0; border-radius:999px;
+  background:var(--ink); box-shadow:0 8px 20px rgba(40,36,30,.28);
+  transition:transform .5s cubic-bezier(.65,0,.35,1), width .5s cubic-bezier(.65,0,.35,1), background .35s ease;
+  z-index:0; pointer-events:none}
+.tab{position:relative; z-index:1; display:inline-flex; align-items:center; gap:9px; background:none; border:0; border-radius:999px;
+  padding:12px 20px 12px 14px; cursor:pointer; white-space:nowrap;
+  font-family:var(--sans); font-weight:400; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); transition:color .35s}
+.tab-icon{width:17px; height:17px; flex:0 0 auto; display:inline-flex}
+.tab-icon svg{width:100%; height:100%; display:block}
+@keyframes iconSpinPop{0%{transform:rotate(0) scale(1)}45%{transform:rotate(210deg) scale(1.3)}75%{transform:rotate(345deg) scale(.92)}100%{transform:rotate(360deg) scale(1)}}
+.tab:hover .tab-icon{animation:iconSpinPop .6s cubic-bezier(.34,1.56,.64,1) 1}
+.tab[aria-selected="true"] .tab-icon{animation:iconSpinPop .6s cubic-bezier(.34,1.56,.64,1) 1}
+.tab .num{font-family:var(--serif); font-style:italic; font-size:12.5px; letter-spacing:0; opacity:.65}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--surface)}
+@media(max-width:760px){ .tab{padding:11px 16px 11px 12px; font-size:11px} }
 
 /* map — the highlight */
-.map-shell{position:relative; width:100%; height:72vh; min-height:480px; border:1px solid var(--line); overflow:hidden; background:var(--surface-2)}
-@media(min-width:920px){ .map-shell{height:clamp(600px,82vh,900px)} }
+/* scroll-margin = fixed nav height + the 24px the .reveal animation lifts the
+   shell after the jump, so a first-visit anchor click lands flush under the nav */
+.map-shell{position:relative; width:100%; height:76vh; min-height:520px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); overflow:hidden; background:var(--surface-2); box-shadow:0 40px 90px -40px rgba(40,36,30,.4); margin:8px 0 70px; scroll-margin-top:102px}
+@media(max-width:760px){ .map-shell{scroll-margin-top:88px} }
+@media(min-width:920px){ .map-shell{height:clamp(640px,88vh,980px)} }
+@media(max-width:760px){ .map-shell{margin-bottom:48px} }
 #map{position:absolute; inset:0}
 .maplibregl-map{font-family:var(--sans)}
 .maplibregl-ctrl-group{border:none !important; border-radius:12px !important; box-shadow:0 3px 12px rgba(40,36,30,.22) !important; background:var(--white) !important; overflow:hidden; margin:14px !important}
-.maplibregl-ctrl-group button{width:42px !important; height:42px !important}
+.maplibregl-ctrl-group button{width:44px !important; height:44px !important}
 .maplibregl-ctrl-group button+button{border-top:1px solid var(--line) !important}
 .maplibregl-ctrl button:hover{background:var(--surface-2) !important}
 .maplibregl-ctrl-attrib{background:rgba(241,237,230,.72) !important; font-size:10px !important}
 .maplibregl-ctrl-attrib a{color:var(--muted)}
-@media(max-width:760px){ .maplibregl-ctrl-group button{width:38px !important; height:38px !important} }
+
+.map-status{position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; text-align:center; padding:32px;
+  background:var(--surface-2); transition:opacity .4s ease}
+.map-status.hidden{opacity:0; pointer-events:none}
+.map-status-text{font-family:var(--sans); font-size:13px; letter-spacing:.06em; color:var(--muted); max-width:320px}
+.load-dogs{display:block; width:min(210px, 48vw); height:auto; margin:0 auto 16px; animation:trot 1.15s ease-in-out infinite}
+@keyframes trot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.map-status-text b{display:block; margin-bottom:10px; font-family:var(--serif); font-style:italic; font-weight:400; font-size:20px; letter-spacing:0; color:var(--ink)}
+.map-retry{margin-top:16px; display:inline-flex; font-family:var(--sans); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink); background:none; border:1px solid var(--line-2); border-radius:999px; padding:10px 20px; cursor:pointer; min-height:44px; align-items:center}
+.map-retry:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
 
 .legend{position:absolute; z-index:5; left:26px; bottom:26px; background:var(--surface); border:1px solid var(--line);
   padding:11px 18px; display:flex; align-items:center; gap:11px; font-family:var(--sans); font-size:11px; font-weight:400; letter-spacing:.18em; text-transform:uppercase; color:var(--ink)}
@@ -117,26 +202,56 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pin{opacity:0; transition:opacity .45s ease; cursor:pointer}
 .pin.show{opacity:1}
 .pin.dim{opacity:.42}
-.pin .pill{background:var(--paper); color:var(--ink); border:1px solid var(--line-2); border-radius:999px; padding:7px 13px;
+.pin .pill{background:var(--paper); color:var(--ink); border:1.5px solid var(--pin-color, var(--line-2)); border-radius:999px; padding:7px 13px;
   font-family:var(--sans); font-weight:400; font-size:12px; line-height:1; white-space:nowrap; box-shadow:0 2px 9px rgba(40,36,30,.22);
   transition:transform .18s ease, background .22s, color .22s, box-shadow .22s}
 .pin:hover .pill{transform:scale(1.06); box-shadow:0 5px 15px rgba(40,36,30,.3)}
-.pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 7px 20px rgba(40,36,30,.4)}
+.pin:active .pill{transform:scale(.96)}
+.pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 0 0 3px var(--pin-color, var(--ink)), 0 7px 20px rgba(40,36,30,.4)}
 
-/* popup */
-.maplibregl-popup{max-width:292px !important}
+/* popup — mobile-first, viewport-relative so it always fits and scales with the
+   page/orientation automatically (no JS resizing needed) */
+.maplibregl-popup{max-width:min(80vw, 300px) !important}
 .maplibregl-popup-content{border-radius:0; padding:0; background:var(--paper); border:1px solid var(--line-2); box-shadow:0 20px 50px rgba(40,36,30,.2)}
 .maplibregl-popup-tip{display:none}
-.maplibregl-popup-close-button{color:var(--muted); font-size:22px; line-height:1; padding:10px 13px 0 0; right:0; top:0; background:none}
+.maplibregl-popup-close-button{color:var(--muted); font-size:26px; line-height:1; padding:6px 12px 0 0; right:0; top:0; background:none; min-width:40px; min-height:40px}
 .maplibregl-popup-close-button:hover{background:none; color:var(--ink)}
-.pop{max-height:min(60vh,460px); overflow:auto; padding:28px}
-.pop .eyebrow{color:var(--muted); display:block}
-.pop h3{font-family:var(--serif); font-weight:400; font-size:28px; margin-top:12px; color:var(--ink); line-height:1.12}
-.pop-story{margin-top:16px; font-family:var(--sans); font-weight:300; font-size:14px; line-height:1.75; color:var(--ink-2)}
-.pop-tip{margin-top:20px; padding-top:20px; border-top:1px solid var(--line)}
+.pop{max-height:min(52vh, 420px); overflow:auto; padding:20px 22px}
+.pop .eyebrow{color:var(--muted); display:block; font-size:10px}
+.pop h3{font-family:var(--serif); font-weight:400; font-size:23px; margin-top:10px; color:var(--ink); line-height:1.14}
+.pop-story{margin-top:12px; font-family:var(--sans); font-weight:300; font-size:13.5px; line-height:1.7; color:var(--ink-2)}
+.pop-tip{margin-top:16px; padding-top:16px; border-top:1px solid var(--line)}
 .pop-tip .eyebrow{color:var(--muted)}
-.pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:18px; line-height:1.5; margin-top:9px; color:var(--ink)}
-.pop-link{margin-top:22px}
+.pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:16.5px; line-height:1.45; margin-top:8px; color:var(--ink)}
+.pop-link{margin-top:18px}
+@media(min-width:760px){
+  /* proportional to the window: ~22vw wide and ~36vh tall, clamped — resizing or
+     zooming the browser rescales it instead of leaving a fixed oversized box */
+  .maplibregl-popup{max-width:clamp(230px, 22vw, 310px) !important}
+  .pop{max-height:clamp(220px, 36vh, 380px); padding:20px 22px}
+  .pop .eyebrow{font-size:10.5px}
+  .pop h3{font-size:clamp(20px, 1.7vw, 24px); margin-top:10px}
+  .pop-story{font-size:13.5px; margin-top:13px}
+  .pop-tip{margin-top:16px; padding-top:16px}
+  .pop-tip .txt{font-size:16px; line-height:1.45}
+}
+
+/* mobile place sheet — on phones the map detail is a bottom sheet instead of an
+   anchored bubble, so it always fits the viewport, scrolls, and never clips
+   against the map edge. Hidden entirely on desktop (the anchored popup is used). */
+.place-sheet{position:fixed; left:0; right:0; bottom:0; z-index:1500; background:var(--paper);
+  border-top:1px solid var(--line-2); border-radius:20px 20px 0 0;
+  box-shadow:0 -24px 60px rgba(40,36,30,.28);
+  transform:translateY(101%); transition:transform .42s cubic-bezier(.2,.7,.2,1);
+  max-height:72vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain; touch-action:pan-y;
+  padding:6px 20px calc(24px + env(safe-area-inset-bottom)) 20px}
+.place-sheet.dragging{transition:none}
+.place-sheet.open{transform:none}
+.place-sheet .sheet-handle{width:40px; height:4px; border-radius:2px; background:var(--line-2); margin:8px auto 2px}
+.place-sheet .sheet-close{position:absolute; top:10px; right:10px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:0; color:var(--muted); font-size:26px; line-height:1; cursor:pointer}
+.place-sheet .pop{max-height:none; padding:12px 2px 0; overflow:visible}
+@media(min-width:761px){ .place-sheet{display:none !important} }
 
 /* cards */
 .rail-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:64px 0 30px; padding-bottom:20px; border-bottom:1px solid var(--line)}
@@ -144,7 +259,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .rail-head .hint{font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); display:inline-flex; gap:10px; align-items:center}
 .cards{display:flex; gap:40px; overflow-x:auto; padding-bottom:16px; cursor:grab; scrollbar-width:none}
 .cards::-webkit-scrollbar{display:none} .cards.dragging{cursor:grabbing}
-.card{flex:0 0 340px; width:340px; cursor:pointer; user-select:none; background:none}
+.card{flex:0 0 340px; width:340px; cursor:pointer; user-select:none; background:none; transition:transform .25s cubic-bezier(.2,.7,.2,1)}
+.card:active{transform:scale(.985)}
 @media(max-width:760px){
   .cards{scroll-snap-type:x mandatory; gap:24px; margin:0 calc(var(--gutter) * -1); padding-left:var(--gutter); padding-right:var(--gutter)}
   .card{flex-basis:80%; width:80%; scroll-snap-align:start}
@@ -154,11 +270,12 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .card .c-img::after{content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(43,41,36,0) 55%, rgba(43,41,36,.16)); opacity:0; transition:opacity .5s}
 .card:hover .c-img::after{opacity:1}
 .card .c-cat{display:block; margin-top:20px; font-family:var(--sans); font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
-.card h3{font-family:var(--serif); font-weight:400; font-size:27px; margin-top:10px; color:var(--ink); line-height:1.15}
+.cat-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--dot, var(--muted)); margin-right:6px; vertical-align:middle}
+.card h4{font-family:var(--serif); font-weight:400; font-size:27px; margin-top:10px; color:var(--ink); line-height:1.15}
 .card .c-desc{margin-top:12px; font-family:var(--sans); font-weight:300; font-size:14.5px; line-height:1.7; color:var(--ink-2);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
 .card .c-more{margin-top:18px}
-.card.active h3{text-decoration:underline; text-underline-offset:5px; text-decoration-thickness:1px}
+.card.active h4{text-decoration:underline; text-underline-offset:5px; text-decoration-thickness:1px}
 
 /* ===== FOOTER / DETAILS ===== */
 .footer{padding:var(--section-gap) 0 90px; text-align:center; border-top:1px solid var(--line)}
@@ -169,8 +286,54 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .footer .meta div:last-child{border-right:0}
 .footer .meta small{display:block; font-family:var(--sans); font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
 .footer .meta b{display:block; margin-top:12px; font-family:var(--serif); font-weight:400; font-size:24px}
-.footer .fmark{margin-top:72px; font-family:var(--serif); font-size:22px; letter-spacing:.42em; padding-left:.42em; color:var(--ink)}
+.footer-art{display:block; width:min(600px, 84vw); height:auto; margin:70px auto 0}
+.footer .fmark{margin-top:40px; font-family:var(--serif); font-size:22px; letter-spacing:.42em; padding-left:.42em; color:var(--ink)}
 @media(max-width:760px){ .footer .meta{flex-direction:column; gap:34px} .footer .meta div{border-right:0; padding:0} }
+
+/* ===== WELCOME (first-visit name capture) ===== */
+.welcome{position:fixed; inset:0; z-index:3000; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:rgba(32,28,36,.55); backdrop-filter:blur(3px); opacity:1; transition:opacity .45s ease}
+.welcome[hidden]{display:none}   /* the class display would otherwise beat the hidden attribute */
+.welcome.leaving{opacity:0; pointer-events:none}
+.welcome-card{background:var(--paper); border:1px solid var(--line-2); max-width:430px; width:100%; padding:40px 36px 32px; text-align:center; box-shadow:0 30px 80px rgba(20,18,24,.35)}
+.welcome-card .eyebrow{color:var(--muted)}
+.welcome-card h2{font-family:var(--serif); font-weight:300; font-size:30px; margin-top:14px}
+.welcome-card p{margin-top:14px; font-size:14px; line-height:1.7; color:var(--ink-2)}
+.welcome-card input{display:block; width:100%; margin-top:22px; padding:14px 16px; font-family:var(--sans); font-size:16px; color:var(--ink);
+  background:var(--white); border:1px solid var(--line-2); border-radius:0; text-align:center}
+.welcome-card input:focus{outline:1px solid var(--ink); outline-offset:2px}
+.welcome-go{display:block; width:100%; margin-top:14px; min-height:48px; padding:13px 20px; cursor:pointer;
+  font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
+  background:var(--ink); color:var(--surface); border:1px solid var(--ink)}
+.welcome-go:hover{background:var(--ink-2)}
+.welcome-skip{display:inline-block; margin-top:16px; background:none; border:0; cursor:pointer; font-family:var(--sans); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); text-decoration:underline; text-underline-offset:4px; min-height:44px}
+.welcome-skip:hover{color:var(--ink)}
+
+/* ===== RECOMMEND ===== */
+.recommend{padding:0 0 var(--section-gap); }
+.rec-inner{max-width:640px; margin:0 auto; text-align:center}
+.rec-inner .eyebrow{color:var(--muted)}
+.rec-inner h2{margin-top:18px; font-size:clamp(30px,4.4vw,48px); font-weight:300}
+.rec-inner .lede{margin-top:20px}
+.rec-form{margin-top:44px; text-align:left}
+.rec-field{margin-bottom:22px}
+.rec-field label{display:block; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:9px}
+.rec-field input,.rec-field textarea{display:block; width:100%; padding:14px 16px; font-family:var(--sans); font-weight:300; font-size:16px; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line-2); border-radius:0; resize:vertical}
+.rec-field input:focus,.rec-field textarea:focus{outline:1px solid var(--ink); outline-offset:2px}
+.rec-error{display:none; margin-top:7px; font-size:12.5px; color:#8C3B2E}
+.rec-field.invalid .rec-error{display:block}
+.rec-field.invalid input,.rec-field.invalid textarea{border-color:#8C3B2E}
+.rec-submit{display:inline-flex; align-items:center; min-height:48px; padding:14px 30px; cursor:pointer;
+  font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
+  background:var(--ink); color:var(--surface); border:1px solid var(--ink); transition:background .3s}
+.rec-submit:hover{background:var(--ink-2)}
+.rec-status{margin-top:22px; font-size:14.5px; line-height:1.7; color:var(--ink-2)}
+.rec-status .link-u{margin-top:10px}
+.cards-cta{margin-top:34px; text-align:center}
+
+.skip-link{position:absolute; left:-999px; top:0; z-index:2000; background:var(--ink); color:var(--surface); padding:14px 22px; font-family:var(--sans); font-size:12px; letter-spacing:.15em; text-transform:uppercase; text-decoration:none}
+.skip-link:focus{left:16px; top:16px}
 
 .reveal{opacity:0; transform:translateY(24px); transition:opacity 1.1s ease, transform 1.1s cubic-bezier(.2,.7,.2,1)}
 .reveal.in{opacity:1; transform:none}
@@ -180,28 +343,135 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </style>
 </head>
 <body>
+<a class="skip-link" href="#map-area">Skip to the map</a>
 <div class="grain" aria-hidden="true"></div>
 
 <nav class="nav" id="nav">
   <div class="nav-inner wrap">
     <a class="nav-left" href="#details">The Details</a>
     <a class="wordmark" href="#top" id="wordmark">HILGA &amp; LUCAS</a>
-    <a class="nav-btn" href="#explore">The Map</a>
+    <a class="nav-btn" href="#map-area">The Map</a>
   </div>
 </nav>
 
 <header class="hero" id="top">
   <div class="hero-scene" aria-hidden="true">
     <svg class="hero-ridge" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="mgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5c5366"/><stop offset="1" stop-color="#363042"/>
+        </linearGradient>
+        <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
+      </defs>
+
+      <!-- far ridge -->
       <path d="M0,432 C220,402 360,414 520,362 C700,304 820,360 1000,342 C1180,322 1330,360 1440,346 L1440,600 L0,600 Z" fill="#6d6472" opacity=".45"/>
-      <path d="M402,600 L566,236 Q582,222 598,236 L764,600 Z" fill="#524b57" opacity=".9"/>
-      <path d="M566,236 Q582,222 598,236 L612,268 Q590,258 572,266 Z" fill="#403a46" opacity=".7"/>
+
+      <!-- drifting clouds, behind the mountain -->
+      <g class="cloud-a" fill="#f3ece2" opacity=".14">
+        <path d="M370,152 Q382,124 420,126 Q436,102 478,110 Q518,92 554,116 Q596,110 610,138 Q638,144 626,164 Q604,178 566,172 Q534,186 494,176 Q446,188 412,174 Q378,178 370,152 Z"/>
+        <path d="M402,192 Q480,204 586,190" fill="none" stroke="#f3ece2" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+      </g>
+      <g class="cloud-b" fill="#f3ece2" opacity=".11">
+        <path d="M712,96 Q722,72 756,74 Q772,54 806,62 Q840,48 868,68 Q902,64 912,88 Q932,94 922,110 Q902,122 872,116 Q844,128 810,120 Q772,130 744,118 Q716,122 712,96 Z"/>
+      </g>
+
+      <!-- Merapi: summit left of centre with the long right shoulder, as in the photo -->
+      <g>
+        <path d="M350,600 C460,470 520,300 552,180 L560,170 L572,176 L584,168
+                 C620,225 650,262 700,288 C770,340 856,462 962,600 Z" fill="url(#mgrad)"/>
+        <path class="plume" d="M548,168 C512,138 462,128 414,140 C452,158 506,166 546,180 Z" fill="#efe3d4" opacity=".12" filter="url(#soft)"/>
+        <g fill="none" stroke="#28232f" stroke-width="2.4" opacity=".5" stroke-linecap="round">
+          <path d="M560,186 C556,262 540,342 512,430"/>
+          <path d="M570,190 C574,268 570,352 556,446"/>
+          <path d="M580,184 C600,250 622,306 664,352"/>
+          <path d="M552,190 C540,252 516,316 482,376"/>
+          <path d="M700,296 C724,346 754,404 792,462"/>
+        </g>
+        <path d="M586,172 C620,226 652,264 702,290 C768,340 850,458 954,592" fill="none" stroke="#e8b183" stroke-width="3" opacity=".3" stroke-linecap="round"/>
+      </g>
+
+      <!-- birds -->
+      <g fill="none" stroke="#dccfbe" stroke-width="2.4" stroke-linecap="round" opacity=".55">
+        <path d="M842,232 q9,-10 18,0 q9,-10 18,0"/>
+        <path d="M898,258 q7,-8 14,0 q7,-8 14,0" opacity=".7"/>
+      </g>
+
+      <!-- mid ridge with treeline -->
       <path d="M0,472 C250,442 400,472 600,452 C820,430 980,476 1200,456 C1330,448 1440,472 1440,472 L1440,600 L0,600 Z" fill="#3e3944"/>
+      <g fill="#332e3c">
+        <ellipse cx="120" cy="454" rx="15" ry="10"/><ellipse cx="140" cy="458" rx="11" ry="8"/><ellipse cx="104" cy="459" rx="9" ry="7"/>
+        <ellipse cx="345" cy="466" rx="17" ry="11"/><ellipse cx="368" cy="470" rx="11" ry="8"/><ellipse cx="326" cy="471" rx="9" ry="7"/>
+        <ellipse cx="700" cy="448" rx="14" ry="9"/><ellipse cx="719" cy="452" rx="9" ry="7"/>
+        <ellipse cx="1052" cy="458" rx="15" ry="10"/><ellipse cx="1072" cy="462" rx="10" ry="7"/><ellipse cx="1036" cy="463" rx="8" ry="6"/>
+      </g>
+
+      <!-- near ridge with treeline and corner foliage -->
       <path d="M0,522 C220,502 380,542 560,516 C760,488 900,546 1120,520 C1300,500 1440,536 1440,530 L1440,600 L0,600 Z" fill="#2a262e"/>
+      <g fill="#1f1b25">
+        <ellipse cx="242" cy="518" rx="18" ry="11"/><ellipse cx="264" cy="523" rx="13" ry="9"/><ellipse cx="226" cy="525" rx="11" ry="8"/>
+        <ellipse cx="560" cy="514" rx="16" ry="10"/><ellipse cx="581" cy="519" rx="11" ry="8"/>
+        <ellipse cx="884" cy="527" rx="20" ry="12"/><ellipse cx="908" cy="532" rx="13" ry="9"/><ellipse cx="862" cy="533" rx="11" ry="8"/>
+        <ellipse cx="1160" cy="519" rx="17" ry="10"/><ellipse cx="1181" cy="524" rx="11" ry="8"/>
+        <ellipse cx="1358" cy="540" rx="26" ry="15"/><ellipse cx="1408" cy="532" rx="18" ry="12"/><ellipse cx="1432" cy="546" rx="14" ry="10"/>
+      </g>
     </svg>
   </div>
   <div class="hero-photo" aria-hidden="true"></div>
   <div class="hero-scrim" aria-hidden="true"></div>
+  <!-- blossom branch with a perched bird, in the spirit of the reference painting -->
+  <svg class="hero-flora" viewBox="0 0 360 330" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <g fill="none" stroke="#221d29" stroke-linecap="round">
+      <path d="M366,44 C304,62 252,92 218,132 C188,166 168,206 160,252" stroke-width="6.5"/>
+      <path d="M304,66 C272,60 242,62 218,76" stroke-width="4"/>
+      <path d="M254,94 C230,86 208,88 190,100" stroke-width="3.4"/>
+      <path d="M218,132 C198,122 178,124 162,136" stroke-width="3"/>
+      <path d="M186,168 C170,161 152,165 140,178" stroke-width="2.6"/>
+      <path d="M166,214 C152,208 136,212 126,224" stroke-width="2.2"/>
+    </g>
+    <g fill="#55584a" opacity=".85">
+      <ellipse cx="226" cy="79" rx="7" ry="2.6" transform="rotate(-24 226 79)"/>
+      <ellipse cx="196" cy="103" rx="6.4" ry="2.4" transform="rotate(-18 196 103)"/>
+      <ellipse cx="170" cy="139" rx="6" ry="2.3" transform="rotate(-30 170 139)"/>
+      <ellipse cx="146" cy="181" rx="5.6" ry="2.2" transform="rotate(-16 146 181)"/>
+      <ellipse cx="132" cy="227" rx="5.2" ry="2" transform="rotate(-28 132 227)"/>
+      <ellipse cx="286" cy="72" rx="6.6" ry="2.5" transform="rotate(-12 286 72)"/>
+    </g>
+    <g>
+      <circle cx="212" cy="72" r="5" fill="#c98d97"/><circle cx="212" cy="72" r="1.7" fill="#f0d9c8"/>
+      <circle cx="232" cy="88" r="4.2" fill="#b06d7b"/><circle cx="232" cy="88" r="1.4" fill="#e8cbb9"/>
+      <circle cx="184" cy="96" r="5.4" fill="#c98d97"/><circle cx="184" cy="96" r="1.8" fill="#f0d9c8"/>
+      <circle cx="200" cy="112" r="3.6" fill="#b06d7b"/>
+      <circle cx="160" cy="130" r="5" fill="#c98d97"/><circle cx="160" cy="130" r="1.7" fill="#f0d9c8"/>
+      <circle cx="176" cy="146" r="3.8" fill="#b06d7b"/><circle cx="176" cy="146" r="1.3" fill="#e8cbb9"/>
+      <circle cx="136" cy="172" r="4.8" fill="#c98d97"/><circle cx="136" cy="172" r="1.6" fill="#f0d9c8"/>
+      <circle cx="152" cy="188" r="3.4" fill="#b06d7b"/>
+      <circle cx="122" cy="218" r="4.4" fill="#c98d97"/><circle cx="122" cy="218" r="1.5" fill="#f0d9c8"/>
+      <circle cx="138" cy="234" r="3.2" fill="#b06d7b"/>
+      <circle cx="156" cy="246" r="3.8" fill="#c98d97"/><circle cx="156" cy="246" r="1.3" fill="#f0d9c8"/>
+      <circle cx="262" cy="80" r="4.6" fill="#c98d97"/><circle cx="262" cy="80" r="1.5" fill="#f0d9c8"/>
+      <circle cx="298" cy="60" r="3.8" fill="#b06d7b"/>
+      <circle cx="330" cy="50" r="4.4" fill="#c98d97"/><circle cx="330" cy="50" r="1.5" fill="#f0d9c8"/>
+      <circle cx="246" cy="106" r="2.6" fill="#96586a"/>
+      <circle cx="208" cy="140" r="2.4" fill="#96586a"/>
+      <circle cx="146" cy="206" r="2.3" fill="#96586a"/>
+    </g>
+    <!-- perched bird -->
+    <g transform="translate(238,116) rotate(-6)">
+      <path d="M-18,4 L-40,14 L-34,2 Z" fill="#4f6076"/>
+      <ellipse cx="0" cy="0" rx="17" ry="9.5" fill="#6d8299"/>
+      <circle cx="14" cy="-8" r="7" fill="#6d8299"/>
+      <path d="M20,-8 l9,2.4 -9,2.4 Z" fill="#3f4c5c"/>
+      <circle cx="16.5" cy="-9.5" r="1.4" fill="#f1ede6"/>
+      <path d="M-4,-2 C2,-6 8,-6 12,-2 C8,2 2,3 -4,-2 Z" fill="#5c718a"/>
+    </g>
+    <!-- falling petals -->
+    <g fill="#c98d97" opacity=".55">
+      <ellipse cx="196" cy="278" rx="3.4" ry="1.8" transform="rotate(24 196 278)"/>
+      <ellipse cx="238" cy="252" rx="3" ry="1.6" transform="rotate(-30 238 252)"/>
+      <ellipse cx="170" cy="304" rx="2.8" ry="1.5" transform="rotate(12 170 304)"/>
+    </g>
+  </svg>
   <div class="hero-content wrap">
     <span class="eyebrow">A guide for our guests</span>
     <h1 class="hero-title">Our <em>Yogyakarta</em></h1>
@@ -212,8 +482,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </header>
 
 <section class="note" id="note">
-  <div class="wrap">
-    <div class="reveal">
+  <div class="note-sticky">
+    <div class="note-floats" aria-hidden="true">
+      <figure class="gfloat front"        data-depth="1.3"  data-z="90"   data-dx="-30" style="--x:12%; --y:6%;  --w:250px; --rot:-4deg"><img src="assets/places/merapi-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mount Merapi</figcaption></figure>
+      <figure class="gfloat"              data-depth="0.9"  data-z="-140" data-dx="24"  style="--x:74%; --y:10%; --w:220px; --rot:3deg"><img src="assets/places/sate-klathak-pak-bari-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Sate Klathak Pak Bari</figcaption></figure>
+      <figure class="gfloat front"        data-depth="1.6"  data-z="140"  data-dx="-40" style="--x:3%;  --y:38%; --w:190px; --rot:-6deg"><img src="assets/places/warung-bu-kadek-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Warung Bu Kadek</figcaption></figure>
+      <figure class="gfloat"              data-depth="1.1"  data-z="-60"  data-dx="36"  style="--x:80%; --y:42%; --w:200px; --rot:5deg"><img src="assets/places/djaya-roasters-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Djaya Roasters</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="0.7"  data-z="-220" data-dx="-18" style="--x:12%; --y:66%; --w:180px; --rot:4deg"><img src="assets/places/suara-dewandaru-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Suara Dewandaru</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="1.2"  data-z="30"   data-dx="22"  style="--x:60%; --y:2%;  --w:150px; --rot:-3deg"><img src="assets/places/tusen-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>TUSEN</figcaption></figure>
+      <figure class="gfloat front"        data-depth="1.45" data-z="110"  data-dx="30"  style="--x:56%; --y:70%; --w:190px; --rot:-5deg"><img src="assets/places/bubur-yoyong-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Bubur Yoyong</figcaption></figure>
+      <figure class="gfloat"              data-depth="1.0"  data-z="-30"  data-dx="-26" style="--x:78%; --y:74%; --w:230px; --rot:2deg"><img src="assets/places/kopi-bukan-luwak-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Kopi Bukan Luwak</figcaption></figure>
+      <figure class="gfloat hide-m"       data-depth="0.8"  data-z="-180" data-dx="14"  style="--x:38%; --y:3%;  --w:160px; --rot:6deg"><img src="assets/places/mie-sapi-banteng-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mie Sapi Banteng</figcaption></figure>
+    </div>
+    <div class="wrap note-quote reveal">
       <div class="rule"></div>
       <span class="eyebrow">From us, to you</span>
       <p>“Jogja is small enough to wander on foot and warm enough to feel like home by the second day. Choose a craving, and let the map lead the way.”</p>
@@ -227,33 +508,90 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map — scroll to zoom, drag to move. Select any place to read why it earned its spot on our list.</p>
+      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot.</p>
     </div>
 
-    <div class="tabs reveal" id="switch" role="tablist" aria-label="Choose a category"></div>
+  </div>
 
-    <div class="map-shell reveal">
-      <div id="map"></div>
-      <div class="legend"><span class="dot"></span><span id="legend-text">Loading…</span></div>
+  <div class="map-shell reveal" id="map-area">
+    <div id="map"></div>
+    <div class="tabs" id="switch" role="tablist" aria-label="Filter places by category"></div>
+    <div class="map-status" id="map-status" aria-live="polite">
+      <span class="map-status-text">
+        <img class="load-dogs" src="assets/dogs-running.png" alt="" width="720" height="350" decoding="async" />
+        Loading the map…
+      </span>
     </div>
+    <div class="legend"><span class="dot"></span><span id="legend-text" aria-live="polite">Loading…</span></div>
+  </div>
 
+  <div class="wrap">
     <div class="rail-head">
-      <h3 id="rail-title">Coffee</h3>
+      <h3 id="rail-title">All</h3>
       <span class="hint">Drag to browse &rarr;</span>
     </div>
-    <div class="cards" id="cards" aria-label="Places"></div>
+    <div class="cards" id="cards" aria-label="Places" aria-live="polite"></div>
+    <div class="cards-cta">
+      <a class="link-u" href="#recommend">Know a place we missed? Tell us <span>&rarr;</span></a>
+    </div>
   </div>
 </main>
+
+<section class="recommend" id="recommend">
+  <div class="wrap">
+    <div class="rec-inner reveal">
+      <span class="eyebrow">A friend's recommendation</span>
+      <h2>Know somewhere we missed?</h2>
+      <p class="lede">Got other recommendations that we may have missed? Tell us the places that other guests — or we — need to try, and why we need to try them. Feel free to add below.</p>
+      <form id="rec-form" class="rec-form" novalidate>
+        <div class="rec-field" id="f-by">
+          <label for="rec-by">Your name</label>
+          <input id="rec-by" name="by" type="text" autocomplete="name" />
+          <p class="rec-error">Tell us who you are, so we know who to thank.</p>
+        </div>
+        <div class="rec-field" id="f-place">
+          <label for="rec-place">The place</label>
+          <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…" />
+          <p class="rec-error">What's the place called?</p>
+        </div>
+        <div class="rec-field" id="f-why">
+          <label for="rec-why">Why do we need to try it?</label>
+          <textarea id="rec-why" name="why" rows="4" placeholder="What should we order? What makes it special?"></textarea>
+          <p class="rec-error">Give us a line on why it's worth the trip.</p>
+        </div>
+        <button type="submit" class="rec-submit">Add your recommendation</button>
+        <p class="rec-status" id="rec-status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- Mobile-only bottom sheet for a selected place (populated by JS) -->
+<div class="place-sheet" id="place-sheet" role="dialog" aria-modal="false" aria-label="Place details" hidden></div>
+
+<!-- First-visit welcome: just a name, no login (shown by JS when no name is stored) -->
+<div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title" hidden>
+  <div class="welcome-card">
+    <span class="eyebrow">Selamat datang</span>
+    <h2 id="welcome-title">Tell us who's wandering</h2>
+    <p>No login, no fuss — just your name, so the guide knows you next time and we know who to thank when you point us somewhere new.</p>
+    <input id="welcome-name" type="text" autocomplete="name" placeholder="Your name" />
+    <button type="button" class="welcome-go" id="welcome-go">Come on in</button>
+    <button type="button" class="welcome-skip" id="welcome-skip">I'd rather stay anonymous</button>
+  </div>
+</div>
 
 <footer class="footer" id="details">
   <div class="wrap reveal">
     <span class="eyebrow">The celebration</span>
     <h2>We cannot wait to share this city — and this day — with you.</h2>
     <div class="meta">
-      <div><small>The day</small><b>12 October 2026</b></div>
+      <div><small>The day</small><b>08 August 2026</b></div>
+      <div><small>The venue</small><b>Wyndham Garden Yogyakarta</b></div>
       <div><small>The city</small><b>Yogyakarta</b></div>
       <div><small>Dress code</small><b>Garden Formal</b></div>
     </div>
+    <img class="footer-art" src="assets/couple-dogs.png" alt="Illustration of Hilga and Lucas walking hand in hand, their three dogs running ahead" width="1400" height="705" loading="lazy" decoding="async" />
     <div class="fmark">HILGA &amp; LUCAS</div>
   </div>
 </footer>
@@ -267,15 +605,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    ============================================================ */
 const PLACES = [
   /* COFFEE */
-  { category:"coffee", name:"Couvee", area:"Sagan", coords:[-7.7811167,110.3775203],
+  { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203],
     blurb:"A buzzy all-day cafe — and very good matcha.",
     story:"A local favourite with branches across the city: generous indoor and outdoor seating, arabica coffee, pastries and rice bowls. Easy to settle into for an hour or three.",
     note:"Order the matcha. Comfortable for working; busiest in the evenings." },
-  { category:"coffee", name:"Djaya Roasters", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
+  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
     blurb:"A small roastery for people who take coffee seriously.",
     story:"A minimal, focused coffee bar and roastery with local, imported and exotic beans — strong on manual brews, and you can buy beans to take home.",
     note:"Ask for a manual brew and let the barista choose the bean. Free parking." },
-  { category:"coffee", name:"Suara Dewandaru", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
+  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
     blurb:"A bamboo-forest cafe with vinyl, jazz and mocktails.",
     story:"Tucked into the cooler hills north of the city, ringed by bamboo, with a vinyl soundtrack and a menu of coffee and mocktails. Peaceful, a little remote, lovely by daylight.",
     note:"The Mocktail Dewandaru is the one. The lane in is narrow — come before dusk." },
@@ -301,29 +639,29 @@ const PLACES = [
     note:"The ceremonial matcha latte; ask for less sugar if you like it grassy." },
 
   /* SLOW BAR */
-  { category:"slowbar", name:"TUSEN", area:"Kotabaru", coords:[-7.7857793,110.3707008],
+  { category:"slowbar", name:"TUSEN", img:"assets/places/tusen.jpg", area:"Kotabaru", coords:[-7.7857793,110.3707008],
     blurb:"A speakeasy-style cocktail bar with great music.",
     story:"An intimate cocktail bar in Kotabaru with inventive drinks, craft beer and a calm, music-led room. The later evening is 21+.",
     note:"Sit at the bar and let the bartender choose. Evenings only, from 5pm." },
-  { category:"slowbar", name:"Fifth Note", area:"Damai · Ngaglik", coords:[-7.730442,110.3796993],
+  { category:"slowbar", name:"Fifth Note", img:"assets/places/fifth-note.jpg", area:"Damai · Ngaglik", coords:[-7.730442,110.3796993],
     blurb:"A cosy listening-bar cafe with a vinyl setup.",
     story:"A small, mid-century-styled coffee and listening space up north, with a vinyl record selection and a warm, intentional atmosphere. Open late.",
     note:"Good for an unhurried evening and a record. The music runs a touch loud." },
-  { category:"slowbar", name:"TIP TAP TOE", area:"Palagan · Sariharjo", coords:[-7.7263419,110.3810137],
+  { category:"slowbar", name:"TIP TAP TOE", img:"assets/places/tip-tap-toe.jpg", area:"Palagan · Sariharjo", coords:[-7.7263419,110.3810137],
     blurb:"A big, leafy resto-bar — pool, live music, the works.",
     story:"A spacious restaurant and bar with indoor and outdoor areas, a pool, live music, a bakery and gelato stand, and a wide menu from pizza and pasta to local dishes, cocktails and wine.",
     note:"Great for a relaxed group evening. Note the tax and service charge." },
 
   /* FOOD */
-  { category:"food", name:"Sate Klathak Pak Pong", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
+  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
     blurb:"The legendary goat sate grilled on iron spokes.",
     story:"Perhaps Jogja's most famous sate klathak: chunks of goat seasoned simply with salt, grilled on iron bicycle spokes, served with a warm curry broth. Worth the trip out to Bantul.",
     note:"Don't skip the gulai. It's a 25–30 minute drive south of the centre." },
-  { category:"food", name:"Sate Klathak Pak Bari", area:"Pasar Wonokromo · Bantul", coords:[-7.8707352,110.3921127],
+  { category:"food", name:"Sate Klathak Pak Bari", img:"assets/places/sate-klathak-pak-bari.jpg", area:"Pasar Wonokromo · Bantul", coords:[-7.8707352,110.3921127],
     blurb:"Iron-skewer goat sate, cooked inside a night market.",
     story:"Sate klathak grilled by Pak Bari himself in a stall inside Wonokromo Market — tender, salt-grilled goat with curry broth, in a bustling, no-frills setting. Evenings only.",
     note:"Arrive before 7pm — it opens at 6:30 and fills up fast." },
-  { category:"food", name:"Kopi Bukan Luwak", area:"Kaliurang · Pakem", coords:[-7.6706033,110.4194033],
+  { category:"food", name:"Kopi Bukan Luwak", img:"assets/places/kopi-bukan-luwak.jpg", area:"Kaliurang · Pakem", coords:[-7.6706033,110.4194033],
     blurb:"Kampung-style Javanese feasting in a joglo, up north.",
     story:"From the people behind Kopi Klotok, but calmer: self-service Javanese village cooking — mangut asap, telur gimbal, mendoan — in a traditional joglo near Kaliurang. You pay at the end by showing a photo of your plate.",
     note:"Go early for coro bikang from 7am. The smoked-fish mangut asap is the pick." },
@@ -331,46 +669,82 @@ const PLACES = [
     blurb:"Arguably the best ramen in the city.",
     story:"A hugely popular Japanese ramen spot on Jl. Magelang, known for rich broths and tender wagyu and saikoro beef. Expect a queue.",
     note:"The Saikoro and Wagyu Baitan are the bestsellers — arrive early or reserve." },
-  { category:"food", name:"Ayam Geprek Bu Made", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
+  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
     blurb:"Smashed fried chicken with a serious sambal.",
     story:"A beloved blue-tent warung where they truly geprek the chicken — crisp, tender, then smashed with a punchy sambal bawang. Pick your pieces and chilli level at the counter.",
     note:"The sambal is no joke — ask for fewer chillies if unsure. Don't miss the tongseng." },
-  { category:"food", name:"Gudeg Bromo (Bu Tekluk)", area:"Jl. Affandi · Gejayan", coords:[-7.7737295,110.3895916],
+  { category:"food", name:"Gudeg Bromo (Bu Tekluk)", img:"assets/places/gudeg-bromo.jpg", area:"Jl. Affandi · Gejayan", coords:[-7.7737295,110.3895916],
     blurb:"Late-night gudeg — savoury and spicy, not sweet.",
     story:"A famous sidewalk gudeg on Jl. Affandi that flips the script: savoury and spicy rather than sweet, with a bold krecek, eaten lesehan-style on mats. Opens around 10:30pm until dawn.",
     note:"A proper late-night supper — go for the spicy krecek and areh." },
-  { category:"food", name:"Warung Bu Kadek Khas Bali", area:"Kalasan · Sleman", coords:[-7.7714215,110.4468392],
+  { category:"food", name:"Warung Bu Kadek Khas Bali", img:"assets/places/warung-bu-kadek.jpg", area:"Kalasan · Sleman", coords:[-7.7714215,110.4468392],
     blurb:"Authentic Balinese nasi campur (pork / non-halal).",
     story:"Some of the best Balinese food in Jogja — bold, spicy nasi campur babi with tender pork and proper sambal. A taste of Bali east of the city. Closed Mondays.",
     note:"The nasi campur and babi goreng. There's a special menu on Sundays." },
-  { category:"food", name:"Bubur Yoyong", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
+  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
     blurb:"Chinese-style morning porridge with stir-fried toppings.",
     story:"A long-running breakfast spot serving light, well-seasoned porridge with unusual stir-fried toppings, plus nasi gongso and Hainan fried rice. Mornings only, closed Sundays.",
     note:"A great early breakfast — try the nasi gongso and add cakwe." },
-  { category:"food", name:"Tio Ciu Bang Sinyo", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
+  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
     blurb:"Generous, comforting Teochew-style Chinese food.",
     story:"A long-time student favourite near Mrican: big portions of Teochew-Chinese cooking at gentle prices — five-spice ngohyang chicken, kangkung hotplate, seafood hotplate.",
     note:"The ngohyang chicken and a hotplate. Cheap, fast, always packed." },
-  { category:"food", name:"Mie Sapi Banteng", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
+  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
     blurb:"Springy beef noodles — and the best wontons.",
     story:"A noodle shop known for thin, springy beef noodles and outstanding pangsit (wontons), both fried and boiled. Closed Thursdays and Sundays.",
     note:"Order both the boiled and fried pangsit. Lunchtime only." },
-  { category:"food", name:"Sate Babi Koh Ben", area:"Kricak · Tegalrejo", coords:[-7.7682427,110.3549044],
+  { category:"food", name:"Sate Babi Koh Ben", img:"assets/places/sate-babi-koh-ben.jpg", area:"Kricak · Tegalrejo", coords:[-7.7682427,110.3549044],
     blurb:"Tender pork sate in a leafy, tucked-away spot (non-halal).",
     story:"A Chinese-Indonesian pork specialist set among trees inside the Puskat compound: juicy grilled sate babi, rich babi kecap and pork bakso.",
     note:"The sate babi and babi kecap. A calm, green setting." },
-  { category:"food", name:"Bakmi Jawa Mas Timbul", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
+  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
     blurb:"Charcoal-cooked Javanese noodles, late into the night.",
     story:"Authentic bakmi Jawa cooked over a charcoal fire — smoky bakmi godog and goreng, ayam rica, magelangan — in a warm, traditional room with an angkringan section. Open till 2am.",
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
 ];
 
-const CATS = { coffee:{label:"Coffee"}, slowbar:{label:"Slow Bar"}, food:{label:"Foodies"} };
-const ORDER = ["coffee","slowbar","food"];
+/* color = accent used on pins/card dots (light, decorative). active = darker shade used behind
+   the selected-tab label so cream text on it still clears 4.5:1 contrast. */
+const CATS = {
+  all:     { label:"All",      color:null,      active:null,
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M14.6 9.4 12.9 12.9 9.4 14.6 11.1 11.1Z"/></svg>` },
+  coffee:  { label:"Coffee",   color:"#A67C52", active:"#7A5A3D",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5Z"/><path d="M16 10.3h1.3a2.2 2.2 0 1 1 0 4.4H16"/><path d="M8.6 4.3c-.6.7-.6 1.3 0 2M12 4.3c-.6.7-.6 1.3 0 2"/></svg>` },
+  slowbar: { label:"Slow Bar", color:"#6E4A5E", active:"#5C3B49",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5.2h15L12 13.6Z"/><path d="M12 13.6V19"/><path d="M8.3 19h7.4"/></svg>` },
+  food:    { label:"Foodies",  color:"#5F7350", active:"#4B5C3F",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.3 3.2v5.3M8.6 3.2v5.3M10.9 3.2v5.3M8.6 8.5V21"/><path d="M16.3 3.2c-1.7 1.8-1.7 4.6 0 6.4V21"/></svg>` },
+  friends: { label:"From Friends", color:"#5B7C99", active:"#48627A",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C7.7 16.1 4.7 13 4.7 9.9 4.7 7.5 6.5 5.7 8.7 5.7c1.3 0 2.5.6 3.3 1.7.8-1.1 2-1.7 3.3-1.7 2.2 0 4 1.8 4 4.2 0 3.1-3 6.2-7.3 9.6Z"/></svg>` }
+};
+const ORDER = ["all","coffee","slowbar","food","friends"];
+
+/* guest identity + their recommendations, remembered on this device */
+const store = {
+  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
+  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
+  get name(){ return this.read('oy_name',''); },
+  set name(v){ this.write('oy_name', v); },
+  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
+  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
+  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
+  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
+};
+
+/* merged data: curated PLACES + this guest's own recommendations */
+let ALL = [];
+function refreshAll(){
+  ALL = PLACES.concat(store.recs.map(r => ({
+    category:'friends', name:r.place, area: r.by ? `by ${r.by}` : 'by a friend',
+    coords:r.coords || null, blurb:r.why, story:r.why,
+    note:`A tip from ${r.by || 'a friend'} — terima kasih!`
+  })));
+}
+refreshAll();
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
 function gradFor(name){ let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))>>>0; const g=GRADS[h%GRADS.length]; return `linear-gradient(150deg,${g[0]},${g[1]})`; }
 
-let map, markers = [], popup, active = "coffee", activeIdx = -1;
+let map, markers = [], popup, active = "all", activeIdx = -1;
 const switchEl=document.getElementById('switch');
 const cardsEl=document.getElementById('cards');
 const legendEl=document.getElementById('legend-text');
@@ -386,16 +760,36 @@ function makeDraggable(el){
 }
 makeDraggable(cardsEl);
 
+const highlightEl=document.createElement('span');
+highlightEl.className='tab-highlight'; highlightEl.setAttribute('aria-hidden','true');
+switchEl.appendChild(highlightEl);
+
+const countFor = key => key==='all' ? ALL.length : ALL.filter(p=>p.category===key).length;
+function updateTabCounts(){
+  [...switchEl.querySelectorAll('.tab')].forEach(b=>{ b.querySelector('.num').textContent = countFor(b.dataset.cat); });
+  requestAnimationFrame(moveHighlight);   /* counts can change tab widths */
+}
 ORDER.forEach((key,i)=>{
-  const c=CATS[key], n=PLACES.filter(p=>p.category===key).length;
+  const c=CATS[key], n = countFor(key);
   const btn=document.createElement('button');
   btn.className='tab'; btn.dataset.cat=key; btn.setAttribute('role','tab'); btn.setAttribute('aria-selected', i===0?'true':'false');
-  btn.innerHTML=`${c.label}<span class="num">${n}</span>`;
+  btn.setAttribute('aria-controls','cards');
+  btn.innerHTML=`<span class="tab-icon" aria-hidden="true">${c.icon}</span>${c.label}<span class="num">${n}</span>`;
   btn.addEventListener('click', ()=>selectCategory(key));
   switchEl.appendChild(btn);
 });
 
-const placesFor = cat => PLACES.map((p,i)=>({...p,_i:i})).filter(p=>p.category===cat);
+function moveHighlight(){
+  const btn=switchEl.querySelector('.tab[aria-selected="true"]');
+  if(!btn) return;
+  const cat=CATS[btn.dataset.cat];
+  highlightEl.style.transform=`translateX(${btn.offsetLeft}px)`;
+  highlightEl.style.width=btn.offsetWidth+'px';
+  highlightEl.style.background=cat.active || 'var(--ink)';
+}
+requestAnimationFrame(moveHighlight);
+
+const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
 const pinFor  = idx => { const m=markers.find(x=>x.idx===idx); return m? m.el : null; };
 const lngLat  = p => [p.coords[1], p.coords[0]];   /* MapLibre uses [lng, lat] */
@@ -405,14 +799,16 @@ function renderCards(cat){
   placesFor(cat).forEach(p=>{
     const card=document.createElement('article');
     card.className='card'; card.dataset.idx=p._i;
-    const img = p.img ? `<img src="${p.img}" alt="${p.name}">` : ``;
+    card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}`);
+    const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async">` : ``;
     card.innerHTML=`
       <div class="c-img" style="--g:${gradFor(p.name)}">${img}</div>
-      <span class="c-cat">${CATS[cat].label} &nbsp;·&nbsp; ${p.area}</span>
-      <h3>${p.name}</h3>
+      <span class="c-cat"><span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
+      <h4>${p.name}</h4>
       <p class="c-desc">${p.story}</p>
       <span class="c-more link-u">Discover more <span>&rarr;</span></span>`;
     card.addEventListener('click', ()=>{ if(cardsEl._didDrag && cardsEl._didDrag()) return; focusPlace(p._i,true); });
+    card.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); focusPlace(p._i,true); } });
     card.addEventListener('mouseenter', ()=>pinFor(p._i)?.classList.add('active'));
     card.addEventListener('mouseleave', ()=>{ if(activeIdx!==p._i) pinFor(p._i)?.classList.remove('active'); });
     cardsEl.appendChild(card);
@@ -430,6 +826,26 @@ function popupHtml(p){
   </div>`;
 }
 
+const mapStatusEl=document.getElementById('map-status');
+function showMapStatus(html){ mapStatusEl.innerHTML=html; mapStatusEl.classList.remove('hidden'); }
+function hideMapStatus(){ mapStatusEl.classList.add('hidden'); }
+function showMapError(message){
+  legendEl.textContent='Map could not load';
+  showMapStatus(`<span class="map-status-text"><b>Map didn't load</b>${message}<br><button class="map-retry" type="button" onclick="location.reload()">Try again</button></span>`);
+}
+
+function loadMapLibre(cb){
+  if(window.maplibregl) return cb();
+  const link=document.createElement('link');
+  link.rel='stylesheet'; link.href='https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+  document.head.appendChild(link);
+  const script=document.createElement('script');
+  script.src='https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+  script.onload=cb;
+  script.onerror=()=>{ showMapError('Check your connection and try again.'); };
+  document.head.appendChild(script);
+}
+
 function initMap(){
   map = new maplibregl.Map({
     container:'map',
@@ -437,37 +853,47 @@ function initMap(){
     center:[110.395,-7.79], zoom:11.2,
     attributionControl:true, cooperativeGestures:false, dragRotate:false, pitchWithRotate:false
   });
-  map.scrollZoom.enable();               /* scroll to zoom, as requested */
+  map.scrollZoom.enable();               /* plain scroll-wheel zoom, no Ctrl needed */
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
   map.addControl(new maplibregl.FullscreenControl({container:document.querySelector('.map-shell')}), 'top-right');
-  map.on('click', ()=>setActive(-1));
+  map.on('click', ()=>deselect());
   map.on('load', ()=>{
+    hideMapStatus();
     /* nudge the palette toward the warm guide look, where the style allows */
     try{ if(map.getLayer('water')) map.setPaintProperty('water','fill-color','#bfe2f0'); }catch(e){}
     renderMarkers(active);
   });
+  map.on('error', e=>{
+    if(mapStatusEl.classList.contains('hidden')) return;   /* map already loaded fine once — ignore transient tile errors */
+    showMapError('The map style or tiles couldn\'t be reached on this connection.');
+  });
 }
 
 function renderMarkers(cat){
-  markers.forEach(m=>m.marker.remove()); markers=[];
   const list=placesFor(cat);
-  list.forEach(p=>{
+  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
+  if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
+  markers.forEach(m=>m.marker.remove()); markers=[];
+  list.filter(p=>p.coords).forEach(p=>{
     const el=document.createElement('div');
     el.className='pin';
+    el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label', `Show ${p.name} on the map`);
+    el.style.setProperty('--pin-color', CATS[p.category].color);
     el.innerHTML=`<div class="pill">${p.name}</div>`;
     el.addEventListener('click', ev=>{ ev.stopPropagation(); focusPlace(p._i,false); });
+    el.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); focusPlace(p._i,false); } });
     el.addEventListener('mouseenter', ()=>cardFor(p._i)?.classList.add('active'));
     el.addEventListener('mouseleave', ()=>{ if(activeIdx!==p._i) cardFor(p._i)?.classList.remove('active'); });
     const marker=new maplibregl.Marker({element:el, anchor:'center'}).setLngLat(lngLat(p)).addTo(map);
     markers.push({idx:p._i, el, marker});
   });
-  if(list.length){
+  const locs=list.filter(p=>p.coords);
+  if(locs.length){
     const b=new maplibregl.LngLatBounds();
-    list.forEach(p=>b.extend(lngLat(p)));
+    locs.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
   }
-  legendEl.textContent=`${list.length} ${CATS[cat].label} spots we love`;
   requestAnimationFrame(()=>markers.forEach(m=>m.el.classList.add('show')));
 }
 
@@ -483,21 +909,79 @@ function setActive(idx){
   [...cardsEl.children].forEach(c=>c.classList.toggle('active', +c.dataset.idx===idx));
   refreshDim();
 }
+/* --- place detail: bottom sheet on phones, anchored popup on desktop --- */
+const sheetEl=document.getElementById('place-sheet');
+const mqMobile=window.matchMedia('(max-width:760px)');
+let sheetTimer;
+function openSheet(p){
+  clearTimeout(sheetTimer);
+  sheetEl.innerHTML=`<div class="sheet-handle" aria-hidden="true"></div><button class="sheet-close" type="button" aria-label="Close">&times;</button>${popupHtml(p)}`;
+  sheetEl.hidden=false;
+  sheetEl.querySelector('.sheet-close').addEventListener('click', deselect);
+  requestAnimationFrame(()=>sheetEl.classList.add('open'));
+}
+function closeSheet(){
+  if(sheetEl.hidden) return;
+  sheetEl.classList.remove('open');
+  clearTimeout(sheetTimer);
+  sheetTimer=setTimeout(()=>{ if(!sheetEl.classList.contains('open')){ sheetEl.hidden=true; sheetEl.innerHTML=''; } }, 460);
+}
+function deselect(){
+  if(popup){ popup.remove(); popup=null; }
+  closeSheet();
+  setActive(-1);
+}
+
+/* swipe-down to dismiss: only engages when the sheet is scrolled to its top and
+   the finger moves downward, so scrolling the sheet's own content still works */
+let sheetStartY=0, sheetDY=0, sheetDragging=false;
+sheetEl.addEventListener('touchstart', e=>{
+  if(sheetEl.scrollTop>0) return;
+  sheetStartY=e.touches[0].clientY; sheetDY=0; sheetDragging=true;
+}, {passive:true});
+sheetEl.addEventListener('touchmove', e=>{
+  if(!sheetDragging) return;
+  sheetDY=e.touches[0].clientY-sheetStartY;
+  if(sheetDY>0){
+    sheetEl.classList.add('dragging');
+    sheetEl.style.transform=`translateY(${sheetDY}px)`;
+  }
+}, {passive:true});
+sheetEl.addEventListener('touchend', ()=>{
+  if(!sheetDragging) return;
+  sheetDragging=false;
+  sheetEl.classList.remove('dragging');
+  sheetEl.style.transform='';
+  if(sheetDY>80) deselect();
+});
+
 function focusPlace(idx, fromCard){
   setActive(idx);
-  const p=PLACES[idx];
-  map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
-  if(popup) popup.remove();
-  popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'292px', offset:20})
-    .setLngLat(lngLat(p)).setHTML(popupHtml(p)).addTo(map);
-  if(!fromCard) cardFor(idx)?.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
+  const p=ALL[idx];
+  const mobile=mqMobile.matches;
+  ensureMap(()=>{
+    if(p.coords) map.flyTo({center:lngLat(p), zoom:Math.max(map.getZoom(),15), duration:750, essential:true});
+    if(popup){ popup.remove(); popup=null; }
+    if(mobile){
+      openSheet(p);
+    } else {
+      closeSheet();
+      /* a friend's tip may have no pin yet — anchor its popup at the map centre */
+      const anchor = p.coords ? lngLat(p) : map.getCenter();
+      popup=new maplibregl.Popup({closeButton:true, closeOnClick:true, maxWidth:'none', offset:18})
+        .setLngLat(anchor).setHTML(popupHtml(p)).addTo(map);
+    }
+  });
+  /* Selecting a place on the map shows its detail only — it no longer scrolls the
+     page down to the cards. Tapping a card (fromCard) still just flies the map. */
 }
 function selectCategory(cat){
   if(cat===active) return;
   active=cat;
   [...switchEl.querySelectorAll('.tab')].forEach(b=>b.setAttribute('aria-selected', b.dataset.cat===cat?'true':'false'));
+  moveHighlight();
   railTitle.textContent=CATS[cat].label;
-  if(popup) popup.remove();
+  deselect();
   cardsEl.style.opacity=0;
   setTimeout(()=>{ renderCards(cat); cardsEl.scrollTo({left:0}); cardsEl.style.transition='opacity .5s'; cardsEl.style.opacity=1; },180);
   renderMarkers(cat);
@@ -509,10 +993,156 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 
 const nav=document.getElementById('nav');
 addEventListener('scroll', ()=>{ nav.classList.toggle('solid', window.scrollY > window.innerHeight*0.72); }, {passive:true});
-let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>map&&map.resize(),200); }
+
+/* ---- floating gallery: photos drift with the scroll wheel at depth-scaled speeds ---- */
+const noteEl=document.querySelector('.note');
+const gfloats=[...document.querySelectorAll('.gfloat')];
+gfloats.forEach(f=>{ f.dataset.rotBase=parseFloat(getComputedStyle(f).getPropertyValue('--rot'))||0; });
+function galleryFrame(){
+  const r=noteEl.getBoundingClientRect();
+  const total=Math.max(1, r.height-innerHeight);
+  const p=Math.min(1, Math.max(0, -r.top/total));      /* 0→1 through the section */
+  const travel=Math.min(300, innerHeight*0.34);
+  const midY=innerHeight/2;
+  /* read positions first (from the previous frame's transforms), then write —
+     avoids interleaved layout reads/writes */
+  const centers=gfloats.map(f=>{ const b=f.getBoundingClientRect(); return b.top+b.height/2; });
+  gfloats.forEach((f,i)=>{
+    const d=+f.dataset.depth||1, z=+f.dataset.z||0, dx=+f.dataset.dx||0;
+    const phase=i*1.7;
+    const y=(0.5-p)*2*travel*d;
+    /* sway: a gentle S-curve drift + slight tilt change, phase-shifted per photo
+       so they float like loose paper instead of moving in lockstep */
+    const x=(0.5-p)*2*dx + Math.sin(p*Math.PI*2.2+phase)*9*d;
+    const tilt=(+f.dataset.rotBase) + Math.sin(p*Math.PI*2+phase)*2.2;
+    /* depth breathing: swell slightly near the middle of the screen, ease off at the edges */
+    const closeness=Math.max(0, 1-Math.abs(centers[i]-midY)/midY);
+    const s=(0.97+closeness*0.09).toFixed(3);
+    f.style.transform=`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z}px) rotate(${tilt.toFixed(2)}deg) scale(${s})`;
+  });
+}
+if(noteEl && gfloats.length && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+  let gTick=false;
+  const onGScroll=()=>{ if(!gTick){ gTick=true; requestAnimationFrame(()=>{ gTick=false; galleryFrame(); }); } };
+  addEventListener('scroll', onGScroll, {passive:true});
+  addEventListener('resize', onGScroll, {passive:true});
+  galleryFrame();
+}
+let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>{ map&&map.resize(); moveHighlight(); },200); }
 addEventListener('resize', reflow); addEventListener('orientationchange', reflow);
 
-addEventListener('load', ()=>{ renderCards('coffee'); if(window.maplibregl){ initMap(); } else { legendEl.textContent='Map could not load'; } });
+let mapLoadingStarted=false, mapReadyCallbacks=[];
+function ensureMap(cb){
+  if(map){ cb(); return; }
+  mapReadyCallbacks.push(cb);
+  if(mapLoadingStarted) return;
+  mapLoadingStarted=true;
+  mapObserver.disconnect();
+  loadMapLibre(()=>{ initMap(); mapReadyCallbacks.forEach(fn=>fn()); mapReadyCallbacks=[]; });
+}
+
+const mapObserver=new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{ if(entry.isIntersecting) ensureMap(()=>{}); });
+},{rootMargin:'600px 0px'});
+
+/* ---- guest identity: ask once, remember, greet on return ---- */
+const welcomeEl=document.getElementById('welcome');
+const welcomeInput=document.getElementById('welcome-name');
+const heroEyebrow=document.querySelector('.hero-content .eyebrow');
+const recByInput=document.getElementById('rec-by');
+
+function personalize(){
+  const n=store.name;
+  if(!n) return;
+  heroEyebrow.textContent=`A guide for ${n}`;
+  if(!recByInput.value) recByInput.value=n;
+}
+function closeWelcome(){
+  welcomeEl.classList.add('leaving');
+  setTimeout(()=>{ welcomeEl.hidden=true; }, 500);
+}
+function acceptWelcome(){
+  const n=welcomeInput.value.trim();
+  if(n){ store.name=n; personalize(); }
+  else store.skippedWelcome=true;
+  closeWelcome();
+}
+if(!store.name && !store.skippedWelcome){
+  welcomeEl.hidden=false;
+  document.getElementById('welcome-go').addEventListener('click', acceptWelcome);
+  document.getElementById('welcome-skip').addEventListener('click', ()=>{ store.skippedWelcome=true; closeWelcome(); });
+  welcomeInput.addEventListener('keydown', e=>{ if(e.key==='Enter') acceptWelcome(); });
+  setTimeout(()=>welcomeInput.focus(), 400);
+} else {
+  personalize();
+}
+
+/* ---- a friend's recommendation: save locally, pin via geocoding, email to us ---- */
+const recForm=document.getElementById('rec-form');
+const recStatus=document.getElementById('rec-status');
+
+function geocodeRec(rec){
+  /* best effort: find the place on the map so it gets a real pin. Guests won't
+     know coordinates, so we ask OpenStreetMap's free geocoder and sanity-check
+     the hit is actually around Yogyakarta before pinning it. */
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(rec.place+', Yogyakarta, Indonesia')}`)
+    .then(r=>r.ok?r.json():[])
+    .then(hits=>{
+      if(!hits.length) return;
+      const lat=+hits[0].lat, lon=+hits[0].lon;
+      if(lat<-8.4||lat>-7.2||lon<110.0||lon>110.9) return;
+      const recs=store.recs;
+      const mine=recs.find(x=>x.t===rec.t);
+      if(!mine) return;
+      mine.coords=[lat,lon];
+      store.recs=recs;
+      refreshAll();
+      if(active==='friends'||active==='all') renderMarkers(active);
+    })
+    .catch(()=>{});
+}
+
+recForm.addEventListener('submit', e=>{
+  e.preventDefault();
+  const by=document.getElementById('rec-by').value.trim();
+  const place=document.getElementById('rec-place').value.trim();
+  const why=document.getElementById('rec-why').value.trim();
+  let firstInvalid=null;
+  [['f-by',by],['f-place',place],['f-why',why]].forEach(([id,val])=>{
+    const field=document.getElementById(id);
+    field.classList.toggle('invalid', !val);
+    if(!val && !firstInvalid) firstInvalid=field.querySelector('input,textarea');
+  });
+  if(firstInvalid){ firstInvalid.focus(); return; }
+
+  if(by && !store.name){ store.name=by; personalize(); }
+  const rec={ t:Date.now(), by, place, why, coords:null };
+  store.recs=store.recs.concat([rec]);
+  refreshAll();
+  updateTabCounts();
+  if(active==='friends'||active==='all'){ renderCards(active); renderMarkers(active); }
+  geocodeRec(rec);
+
+  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${by}`);
+  const body=encodeURIComponent(`From: ${by}\nPlace: ${place}\nWhy we should try it:\n${why}`);
+  recStatus.innerHTML=`Terima kasih, ${by}! Your tip is saved on this device and now lives under <b>From Friends</b> on the map.<br>`+
+    `<a class="link-u" href="mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
+    `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  recForm.reset();
+  if(store.name) recByInput.value=store.name;
+});
+
+addEventListener('load', ()=>{
+  renderCards(active);
+  mapObserver.observe(document.querySelector('.map-shell'));
+
+  /* PWA: register the service worker (relative path keeps scope at this folder,
+     so it works on a domain root or a GitHub Pages project subpath). Only runs
+     over https / localhost; silently no-ops otherwise. */
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{ /* offline support is optional */ });
+  }
+});
 </script>
 </body>
 </html>
