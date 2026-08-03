@@ -913,10 +913,22 @@ const CURTAIN_TUNE = {
       if(CHIME){
         const tip = nodes[L];
         const w = Math.atan2(-(tip.x - nodes[0].x), Math.max(1, tip.y - nodes[0].y));
-        const rate = Math.abs(w - s.ang) / dt;
+        /* Smooth the rate before anyone reads it. Straight off the solver it is
+           spiky — the constraint pass nudges positions every step — and a spiky
+           signal against a threshold fires wherever the noise happens to land,
+           which is what made the notes clump and gap. */
+        s.rate += ((w - s.ang) / dt - s.rate) * .35;
+        /* Ring as the strand swings THROUGH rest, not whenever its speed
+           crosses a number. That is where a real chime strikes and where the
+           strand is moving fastest, so each one sounds at most twice per swing,
+           on its own period, and the notes come out evenly spaced instead of in
+           bursts. Speed at that instant is the swing's peak, so the strike
+           loudness tapers by itself as the curtain settles. */
+        if(s.ang !== 0 && (w <= 0) !== (s.ang <= 0)){
+          const speed = Math.abs(s.rate);
+          if(speed >= CHIME_TUNE.threshold) CHIME.strike(i, strands.length, speed);
+        }
         s.ang = w;
-        if(rate >= CHIME_TUNE.threshold && s.rate < CHIME_TUNE.threshold) CHIME.strike(i, strands.length, rate);
-        s.rate = rate;
       }
     }
   }
@@ -1087,10 +1099,17 @@ const CHIME_TUNE = {
                                     for roughly 2.5-3s, which is the ring the brief asks for */
 
   /* ---- when a strand rings ---- */
-  threshold:.75,         /* rad/s of whole-strand swing. Measured: silent at rest,
-                            one note on a slow drift, ~25 notes across 11 strands
-                            on a hard sweep — a scatter, not a burst */
+  threshold:.14,         /* rad/s of swing as a strand passes through rest. Measured on a
+                            wandering hover: no gap longer than 340ms, and still dead
+                            silent when nobody is touching the page */
   cooldown:180,          /* ms before the same strand can ring again */
+  spacing:130,           /* ms minimum between ANY two notes */
+  defer:520,             /* ms a note may be pushed later to keep that spacing. A sweep
+                            phase-locks the strands so they cross rest together; rather
+                            than dropping the pile-up, each note is scheduled a little
+                            after the last, which turns a chord into a run. Past this
+                            much lag a note would no longer belong to the swing you can
+                            see, so it is dropped instead */
   voices:6,              /* concurrent cap; the quietest gets stolen */
 
   /* ---- the bus ---- */
@@ -1113,6 +1132,7 @@ const CHIME_TUNE = {
     ? matchMedia('(prefers-reduced-motion: reduce)').matches
     : store.muted;
   const lastRing = Object.create(null);   /* per-strand cooldown clock */
+  let lastAny = -1e6;                    /* …and the schedule time of the last note played */
 
   /* one frequency per scale degree, climbing left to right across the opening */
   const steps = C.slendro.length * C.octaves;
@@ -1197,9 +1217,14 @@ const CHIME_TUNE = {
     if(muted || !ctx || ctx.state !== 'running') return;
     const now = ctx.currentTime;
 
-    const ms = now * 1000;
+    /* Hold each note back to at least `spacing` after the previous one, instead
+       of dropping whatever arrives too soon — Web Audio schedules ahead, so the
+       pile-up after a sweep comes out as a run rather than a chord and a gap. */
+    const at = Math.max(now, lastAny + C.spacing / 1000);
+    if(at - now > C.defer / 1000) return;
+    const ms = at * 1000;
     if(ms - (lastRing[index] || -1e6) < C.cooldown) return;
-    lastRing[index] = ms;
+    lastRing[index] = ms; lastAny = at;
 
     if(voices.length >= C.voices) steal(now);
 
@@ -1218,10 +1243,10 @@ const CHIME_TUNE = {
     bp.frequency.value = Math.min(12000, freq * (3.5 + amp * 5));
     bp.Q.value = 1.1;
     const ng = ctx.createGain();
-    ng.gain.setValueAtTime(.42 * amp, now);
-    ng.gain.exponentialRampToValueAtTime(1e-4, now + C.strike);
+    ng.gain.setValueAtTime(.42 * amp, at);
+    ng.gain.exponentialRampToValueAtTime(1e-4, at + C.strike);
     src.connect(bp).connect(ng).connect(g);
-    src.start(now); src.stop(now + C.strike + .02);
+    src.start(at); src.stop(at + C.strike + .02);
 
     const oscs = [];
     for(let i = 0; i < C.partials.length; i++){
@@ -1230,15 +1255,15 @@ const CHIME_TUNE = {
       o.frequency.value = freq * C.partials[i];
       const og = ctx.createGain();
       const peak = Math.max(1e-4, amp * .42 / (1 + i * 1.35));
-      og.gain.setValueAtTime(1e-4, now);
-      og.gain.exponentialRampToValueAtTime(peak, now + .004);
-      og.gain.exponentialRampToValueAtTime(1e-4, now + C.decays[i]);
+      og.gain.setValueAtTime(1e-4, at);
+      og.gain.exponentialRampToValueAtTime(peak, at + .004);
+      og.gain.exponentialRampToValueAtTime(1e-4, at + C.decays[i]);
       o.connect(og).connect(g);
-      o.start(now); o.stop(now + C.decays[i] + .05);
+      o.start(at); o.stop(at + C.decays[i] + .05);
       oscs.push(o);
     }
 
-    const v = { g, oscs, amp, at: now };
+    const v = { g, oscs, amp, at };
     voices.push(v);
     oscs[0].onended = ()=>{
       const i = voices.indexOf(v);
