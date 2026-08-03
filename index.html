@@ -17,13 +17,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Our Yogyakarta" />
 
-<link rel="preload" as="image" href="assets/hero/merapi-2048.jpg" media="(min-width: 761px)" fetchpriority="high" />
-<link rel="preload" as="image" href="assets/hero/merapi-1200.jpg" media="(max-width: 760px)" fetchpriority="high" />
-<link rel="preload" as="image" href="assets/hero/merapi-flow.jpg" />
+<link rel="preload" as="image" href="assets/joglo-roof-eave.png" media="(min-width: 761px)" fetchpriority="high" />
+<link rel="preload" as="image" href="assets/joglo-roof-eave-820.png" media="(max-width: 760px)" fetchpriority="high" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+<!-- Aksara Jawa for the curtain. Requested with &text= narrowed to the 42
+     characters the corpus actually uses, which takes Noto Sans Javanese from
+     153KB (Google serves this family as TTF only) down to about 12KB. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Javanese:wght@400;500&text=%21%2C-.KLY%C3%A8%C3%A9%EA%A6%81%EA%A6%83%EA%A6%84%EA%A6%86%EA%A6%88%EA%A6%8C%EA%A6%8E%EA%A6%8F%EA%A6%92%EA%A6%95%EA%A6%97%EA%A6%9A%EA%A6%9F%EA%A6%A0%EA%A6%A1%EA%A6%A2%EA%A6%A4%EA%A6%A5%EA%A6%A7%EA%A6%A9%EA%A6%AA%EA%A6%AB%EA%A6%AD%EA%A6%AE%EA%A6%B0%EA%A6%B1%EA%A6%B2%EA%A6%B4%EA%A6%B6%EA%A6%B8%EA%A6%BA%EA%A6%BB%EA%A7%80&display=swap" rel="stylesheet" />
 
 <!-- MapLibre GL (open-source, no API key needed) is loaded lazily in-script, just before the map scrolls into view -->
 
@@ -31,10 +34,35 @@
 :root{
   --surface:#F1EDE6; --surface-2:#E9E3D8; --paper:#FAF7F0; --white:#FFFFFF;
   --ink:#2B2924; --ink-2:#413D36; --muted:#5E594F; --line:#DAD4C7; --line-2:#BFB8A8;
-  --hero-img:none;
   --serif:"Cormorant Garamond", Georgia, serif; --sans:"Jost", system-ui, sans-serif;
+  --javanese:"Noto Sans Javanese", var(--serif);
   --maxw:1320px; --gutter:64px; --section-gap:150px;
+
+  /* ===== HERO TUNING — the doorway =====
+     Aim the light from here; every shadow layer is derived from these three.
+     The curtain's physics and the wind chime are tuned in CURTAIN_TUNE, at
+     the top of the script. */
+  --sun-azimuth:-15deg;   /* which way the light leans the cast shadow */
+  --sun-elevation:.62;    /* 0 = low sun, long shadow · 1 = overhead, short */
+  --shadow-ink:#5C3F27;   /* warm umber. The wall is warm, so the shadow is too — never neutral black */
+  --shadow-opacity:.36;   /* the cast shadow overall (0.30–0.42 reads best) */
+  --shadow-contact:.42;   /* the tight, dark line hugging the underside of the eaves */
+  --shadow-dx:-10px; --shadow-dy:0px;   /* small offset applied after the projection */
+
+  /* Where the eave line sits below the top of the frame. The roof keeps its own
+     aspect and hangs its eave here, so the apex crops off the top of the
+     viewport — you are standing under it, not looking at it. Capped at 40vw so
+     the roof always reaches the top edge instead of leaving a gap on narrow
+     screens (its natural height is width / 2.2766, i.e. ~44vw). */
+  --roof-h:min(clamp(150px,31vh,350px), 40vw);
+  --roof-aspect:1498 / 658;             /* joglo-roof-eave.png, trimmed to its silhouette */
+
+  /* Derived: how far the silhouette is thrown down the wall. A lower sun
+     (smaller elevation) throws it further. */
+  --shadow-len:calc(.86 / var(--sun-elevation));
+  --roof-src:url("assets/joglo-roof-eave.png");
 }
+@media(max-width:760px){ :root{ --roof-src:url("assets/joglo-roof-eave-820.png") } }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
 body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
@@ -60,6 +88,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .wordmark{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:var(--serif); font-weight:400; font-size:22px; letter-spacing:.42em; padding-left:.42em; white-space:nowrap}
 .nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid rgba(243,239,232,.5); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
 .nav-btn:hover{background:#F3EFE8; color:var(--ink)}
+/* the nav sits over the roof at the top of the page, so it stays light until
+   it lifts off onto the linen and .solid flips it to ink */
 .nav.solid{background:var(--surface); border-bottom:1px solid var(--line)}
 .nav.solid a{color:var(--ink)}
 .nav.solid .nav-btn{border-color:var(--line-2)}
@@ -72,47 +102,103 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   .nav-btn{padding:9px 14px; font-size:10px; letter-spacing:.14em}
 }
 
-/* ===== HERO ===== */
-.hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end}
-.hero-scene{position:absolute; inset:0; transform:scale(1.02); animation:kb 26s ease-in-out infinite alternate;
+/* ===== HERO — a doorway on a still, hot afternoon =====
+   Layers, back to front:
+     0  the wall            .wall
+     1  the text curtain    .curtain > .strand > i
+     2  the roof's shadow   .rshadow  (multiply, ON the curtain — this is what sells the depth)
+     3  the roof            .roof
+     4  UI                  .hero-veil, .hero-content, .mute, .scrollcue
+
+   .hero itself must NOT create a stacking context (no z-index, no filter, no
+   opacity): the shadow layers blend with the curtain and the wall through
+   mix-blend-mode, and an isolating ancestor would trap that blending. */
+.hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end; background:var(--surface)}
+
+/* 0 — the wall. Warm light spills in from the doorway below. */
+.wall{position:absolute; inset:0; z-index:0;
   background:
-    radial-gradient(120% 80% at 74% 66%, rgba(255,214,158,.85) 0%, rgba(255,214,158,0) 42%),
-    linear-gradient(180deg, #2f3550 0%, #45435c 24%, #6d5a62 44%, #a2766a 58%, #d29a74 68%, #ecc498 76%, #f3d7ac 82%)}
-.hero-photo{position:absolute; inset:0; background-image:var(--hero-img); background-size:cover; background-position:center; transform:scale(1.02); animation:kb 26s ease-in-out infinite alternate}
-@keyframes kb{to{transform:scale(1.09)}}
-/* the living Merapi scene: a WebGL canvas painting the photo with drifting
-   clouds, wind in the trees and pointer/tilt parallax. It fades in over the
-   illustrated scene once the texture is ready; if WebGL is unavailable the
-   CSS layers below take over. */
-.hero-canvas{position:absolute; inset:0; width:100%; height:100%; opacity:0; transition:opacity 1.6s ease}
-.hero-canvas.on{opacity:1}
-.hero.photo-hero .hero-flora{display:none}
-.hero.photo-hero .hero-scene{animation:none; opacity:0; visibility:hidden; transition:opacity 1.2s ease .6s, visibility 0s 1.8s}
-.hero-clouds{position:absolute; inset:0; overflow:hidden; pointer-events:none}
-.hero-cloud{position:absolute; width:44vw; height:15vw; min-width:280px; min-height:96px; border-radius:50%;
-  background:radial-gradient(ellipse at 50% 55%, rgba(243,240,235,.5) 0%, rgba(243,240,235,0) 68%);
-  filter:blur(12px); animation:cloud-x linear infinite}
-@keyframes cloud-x{from{transform:translateX(-70vw)} to{transform:translateX(170vw)}}
-.hero-ridge{position:absolute; left:0; right:0; bottom:0; width:100%; height:66%; display:block}
-.hero-scrim{position:absolute; inset:0; background:linear-gradient(180deg, rgba(20,18,24,.28) 0%, rgba(20,18,24,0) 30%, rgba(20,18,24,0) 55%, rgba(20,18,24,.55) 100%)}
-.hero-content{position:relative; z-index:3; color:#F5F1EA; padding-bottom:clamp(48px,9vh,110px); width:100%}
-.hero-content .eyebrow{color:rgba(245,241,234,.82); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
-.hero-title{margin-top:20px; font-size:clamp(46px,9.5vw,116px); font-weight:300; letter-spacing:-.01em; line-height:1; color:#F7F3EC; opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
+    radial-gradient(130% 62% at 50% 116%, rgba(255,232,193,.72) 0%, rgba(255,232,193,0) 66%),
+    linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 38%, var(--paper) 100%)}
+
+/* 1 — the curtain. Strands are hung by the script; each one is a column of
+   Javanese grapheme clusters, pivoting from the eave line above it. */
+.curtain{position:absolute; left:0; right:0; bottom:0; z-index:1; overflow:hidden;
+  top:calc(var(--roof-h) - 12px)}          /* tucked up behind the fascia board */
+.strand{position:absolute; top:var(--dy); left:var(--x); transform-origin:50% 0;
+  transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center;
+  font-family:var(--javanese); font-weight:400; color:var(--ink);
+  font-size:var(--fs); line-height:var(--lh); opacity:var(--op);
+  pointer-events:none; -webkit-user-select:none; user-select:none}
+.strand i{display:block; font-style:normal}
+
+/* 2 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
+   a mask over a warm umber fill, hinged at the eave line (the asset is trimmed
+   so its bottom edge IS the eave) and thrown down the wall with scaleY(-n).
+   The negative scale is the projection — the apex of the roof lands furthest
+   down the wall, exactly as a real cast shadow would.
+   Three copies, each masked to a different band of the throw, give a penumbra
+   that widens with distance.
+   The mask carries the WHOLE silhouette, not the cropped band the roof shows —
+   the apex is off the top of the screen, but its shadow still has to be thrown
+   down the wall, peak first. So the shadow box keeps the image's full aspect
+   and pins only its bottom edge to the eave. */
+.rshadow{position:absolute; left:0; width:100%; aspect-ratio:var(--roof-aspect);
+  bottom:calc(100% - var(--roof-h));
+  z-index:2; pointer-events:none; mix-blend-mode:multiply;
+  background:var(--shadow-ink);
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  -webkit-mask-position:50% 100%, 50% 0; mask-position:50% 100%, 50% 0;
+  -webkit-mask-size:100% 100%, 100% 100%; mask-size:100% 100%, 100% 100%;
+  -webkit-mask-composite:source-in; mask-composite:intersect;
+  transform-origin:50% 100%;
+  transform:translate(var(--shadow-dx), var(--shadow-dy))
+            skewX(calc(var(--sun-azimuth) + var(--shadow-drift, 0deg)))
+            scaleY(calc(-1 * var(--shadow-len)))}
+
+/* The band gradients are in the element's own space, where 100% is the eave and
+   0% is the apex — so *lower* percentages are *further* down the wall once the
+   silhouette is flipped. Nearest the eave: tight and dark. Furthest: wide,
+   faint, and faded out well before the bottom of the viewport. */
+.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 62%, #000 76%, #000 100%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 62%, #000 76%, #000 100%);
+              filter:blur(5px);  opacity:var(--shadow-opacity)}
+.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 30%, #000 44%, #000 68%, transparent 80%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 30%, #000 44%, #000 68%, transparent 80%);
+              filter:blur(15px); opacity:calc(var(--shadow-opacity) * .78)}
+.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 16%, #000 34%, transparent 48%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 16%, #000 34%, transparent 48%);
+              filter:blur(32px); opacity:calc(var(--shadow-opacity) * .52)}
+
+/* the contact shadow — barely thrown, barely blurred, so the roof reads as
+   close to the wall instead of floating in front of it */
+.rshadow-contact{-webkit-mask-image:var(--roof-src); mask-image:var(--roof-src);
+  -webkit-mask-size:100% 100%; mask-size:100% 100%;
+  filter:blur(3px); opacity:var(--shadow-contact);
+  transform:translateY(2px) scaleY(-.055)}
+
+/* 3 — the roof. Same box as the shadow, so mask and image stay welded: full
+   width, its own aspect, eave pinned at --roof-h. The apex crops off the top
+   of the frame — you are standing under the roof, not looking at it. */
+.roof{position:absolute; left:0; width:100%; aspect-ratio:var(--roof-aspect);
+  bottom:calc(100% - var(--roof-h)); z-index:3;
+  background-image:var(--roof-src); background-size:100% 100%;
+  background-repeat:no-repeat; pointer-events:none}
+
+/* 4 — UI. A wash of light under the curtain so the heading stays readable
+   where it crosses the strands, and so the composition sits on something. */
+.hero-veil{position:absolute; left:0; right:0; bottom:0; height:52%; z-index:4; pointer-events:none;
+  background:linear-gradient(180deg, rgba(250,247,240,0) 0%, rgba(250,247,240,.34) 46%, rgba(250,247,240,.66) 80%, rgba(250,247,240,.82) 100%)}
+.hero-content{position:relative; z-index:5; color:var(--ink); padding-bottom:clamp(48px,9vh,110px); width:100%}
+.hero-content .eyebrow{color:var(--muted); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
+.hero-title{margin-top:20px; font-size:clamp(46px,9.5vw,116px); font-weight:300; letter-spacing:-.01em; line-height:1; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
 .hero-title em{font-style:italic}
-.hero-lede{max-width:440px; margin-top:26px; color:rgba(245,241,234,.9); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
-.hero-link{margin-top:34px; color:#F5F1EA; opacity:0; transform:translateY(14px); animation:fade 1.3s .75s ease forwards}
+.hero-lede{max-width:440px; margin-top:26px; color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
+.hero-link{margin-top:34px; color:var(--ink); opacity:0; transform:translateY(14px); animation:fade 1.3s .75s ease forwards}
 @keyframes fade{to{opacity:1; transform:none}}
-.scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:3; color:rgba(245,241,234,.75); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
+.scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:5; color:var(--muted); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
-/* hero illustration life: slowly drifting clouds + summit plume + blossom branch */
-.cloud-a{animation:drifta 64s ease-in-out infinite alternate}
-.cloud-b{animation:driftb 82s ease-in-out infinite alternate}
-.plume{animation:plumef 18s ease-in-out infinite alternate}
-@keyframes drifta{to{transform:translateX(36px)}}
-@keyframes driftb{to{transform:translateX(-44px)}}
-@keyframes plumef{to{transform:translateX(-14px)}}
-.hero-flora{position:absolute; top:66px; right:0; width:clamp(190px, 26vw, 350px); height:auto; z-index:2; pointer-events:none}
-@media(max-width:760px){ .hero-flora{top:72px; width:52vw; max-width:230px} }
 
 /* ===== NOTE — the floating gallery =====
    A tall scroll track with a sticky 100svh stage. The quote stays pinned in the
@@ -371,124 +457,25 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </nav>
 
 <header class="hero" id="top">
-  <div class="hero-scene" aria-hidden="true">
-    <svg class="hero-ridge" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="mgrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#5c5366"/><stop offset="1" stop-color="#363042"/>
-        </linearGradient>
-        <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
-      </defs>
+  <!-- 0 · the wall -->
+  <div class="wall" aria-hidden="true"></div>
 
-      <!-- far ridge -->
-      <path d="M0,432 C220,402 360,414 520,362 C700,304 820,360 1000,342 C1180,322 1330,360 1440,346 L1440,600 L0,600 Z" fill="#6d6472" opacity=".45"/>
+  <!-- 1 · the curtain. Strands are hung by the script from the corpus in
+       assets/javanese-script.txt; purely textural, so the real heading below
+       carries the meaning for screen readers. -->
+  <div class="curtain" id="curtain" aria-hidden="true"></div>
 
-      <!-- drifting clouds, behind the mountain -->
-      <g class="cloud-a" fill="#f3ece2" opacity=".14">
-        <path d="M370,152 Q382,124 420,126 Q436,102 478,110 Q518,92 554,116 Q596,110 610,138 Q638,144 626,164 Q604,178 566,172 Q534,186 494,176 Q446,188 412,174 Q378,178 370,152 Z"/>
-        <path d="M402,192 Q480,204 586,190" fill="none" stroke="#f3ece2" stroke-width="6" stroke-linecap="round" opacity=".7"/>
-      </g>
-      <g class="cloud-b" fill="#f3ece2" opacity=".11">
-        <path d="M712,96 Q722,72 756,74 Q772,54 806,62 Q840,48 868,68 Q902,64 912,88 Q932,94 922,110 Q902,122 872,116 Q844,128 810,120 Q772,130 744,118 Q716,122 712,96 Z"/>
-      </g>
+  <!-- 2 · the roof's shadow, falling ON the curtain -->
+  <div class="rshadow rshadow-far" aria-hidden="true"></div>
+  <div class="rshadow rshadow-mid" aria-hidden="true"></div>
+  <div class="rshadow rshadow-near" aria-hidden="true"></div>
+  <div class="rshadow rshadow-contact" aria-hidden="true"></div>
 
-      <!-- Merapi: summit left of centre with the long right shoulder, as in the photo -->
-      <g>
-        <path d="M350,600 C460,470 520,300 552,180 L560,170 L572,176 L584,168
-                 C620,225 650,262 700,288 C770,340 856,462 962,600 Z" fill="url(#mgrad)"/>
-        <path class="plume" d="M548,168 C512,138 462,128 414,140 C452,158 506,166 546,180 Z" fill="#efe3d4" opacity=".12" filter="url(#soft)"/>
-        <g fill="none" stroke="#28232f" stroke-width="2.4" opacity=".5" stroke-linecap="round">
-          <path d="M560,186 C556,262 540,342 512,430"/>
-          <path d="M570,190 C574,268 570,352 556,446"/>
-          <path d="M580,184 C600,250 622,306 664,352"/>
-          <path d="M552,190 C540,252 516,316 482,376"/>
-          <path d="M700,296 C724,346 754,404 792,462"/>
-        </g>
-        <path d="M586,172 C620,226 652,264 702,290 C768,340 850,458 954,592" fill="none" stroke="#e8b183" stroke-width="3" opacity=".3" stroke-linecap="round"/>
-      </g>
+  <!-- 3 · the roof -->
+  <div class="roof" aria-hidden="true"></div>
 
-      <!-- birds -->
-      <g fill="none" stroke="#dccfbe" stroke-width="2.4" stroke-linecap="round" opacity=".55">
-        <path d="M842,232 q9,-10 18,0 q9,-10 18,0"/>
-        <path d="M898,258 q7,-8 14,0 q7,-8 14,0" opacity=".7"/>
-      </g>
-
-      <!-- mid ridge with treeline -->
-      <path d="M0,472 C250,442 400,472 600,452 C820,430 980,476 1200,456 C1330,448 1440,472 1440,472 L1440,600 L0,600 Z" fill="#3e3944"/>
-      <g fill="#332e3c">
-        <ellipse cx="120" cy="454" rx="15" ry="10"/><ellipse cx="140" cy="458" rx="11" ry="8"/><ellipse cx="104" cy="459" rx="9" ry="7"/>
-        <ellipse cx="345" cy="466" rx="17" ry="11"/><ellipse cx="368" cy="470" rx="11" ry="8"/><ellipse cx="326" cy="471" rx="9" ry="7"/>
-        <ellipse cx="700" cy="448" rx="14" ry="9"/><ellipse cx="719" cy="452" rx="9" ry="7"/>
-        <ellipse cx="1052" cy="458" rx="15" ry="10"/><ellipse cx="1072" cy="462" rx="10" ry="7"/><ellipse cx="1036" cy="463" rx="8" ry="6"/>
-      </g>
-
-      <!-- near ridge with treeline and corner foliage -->
-      <path d="M0,522 C220,502 380,542 560,516 C760,488 900,546 1120,520 C1300,500 1440,536 1440,530 L1440,600 L0,600 Z" fill="#2a262e"/>
-      <g fill="#1f1b25">
-        <ellipse cx="242" cy="518" rx="18" ry="11"/><ellipse cx="264" cy="523" rx="13" ry="9"/><ellipse cx="226" cy="525" rx="11" ry="8"/>
-        <ellipse cx="560" cy="514" rx="16" ry="10"/><ellipse cx="581" cy="519" rx="11" ry="8"/>
-        <ellipse cx="884" cy="527" rx="20" ry="12"/><ellipse cx="908" cy="532" rx="13" ry="9"/><ellipse cx="862" cy="533" rx="11" ry="8"/>
-        <ellipse cx="1160" cy="519" rx="17" ry="10"/><ellipse cx="1181" cy="524" rx="11" ry="8"/>
-        <ellipse cx="1358" cy="540" rx="26" ry="15"/><ellipse cx="1408" cy="532" rx="18" ry="12"/><ellipse cx="1432" cy="546" rx="14" ry="10"/>
-      </g>
-    </svg>
-  </div>
-  <div class="hero-photo" aria-hidden="true"></div>
-  <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
-  <div class="hero-scrim" aria-hidden="true"></div>
-  <!-- blossom branch with a perched bird, in the spirit of the reference painting -->
-  <svg class="hero-flora" viewBox="0 0 360 330" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <g fill="none" stroke="#221d29" stroke-linecap="round">
-      <path d="M366,44 C304,62 252,92 218,132 C188,166 168,206 160,252" stroke-width="6.5"/>
-      <path d="M304,66 C272,60 242,62 218,76" stroke-width="4"/>
-      <path d="M254,94 C230,86 208,88 190,100" stroke-width="3.4"/>
-      <path d="M218,132 C198,122 178,124 162,136" stroke-width="3"/>
-      <path d="M186,168 C170,161 152,165 140,178" stroke-width="2.6"/>
-      <path d="M166,214 C152,208 136,212 126,224" stroke-width="2.2"/>
-    </g>
-    <g fill="#55584a" opacity=".85">
-      <ellipse cx="226" cy="79" rx="7" ry="2.6" transform="rotate(-24 226 79)"/>
-      <ellipse cx="196" cy="103" rx="6.4" ry="2.4" transform="rotate(-18 196 103)"/>
-      <ellipse cx="170" cy="139" rx="6" ry="2.3" transform="rotate(-30 170 139)"/>
-      <ellipse cx="146" cy="181" rx="5.6" ry="2.2" transform="rotate(-16 146 181)"/>
-      <ellipse cx="132" cy="227" rx="5.2" ry="2" transform="rotate(-28 132 227)"/>
-      <ellipse cx="286" cy="72" rx="6.6" ry="2.5" transform="rotate(-12 286 72)"/>
-    </g>
-    <g>
-      <circle cx="212" cy="72" r="5" fill="#c98d97"/><circle cx="212" cy="72" r="1.7" fill="#f0d9c8"/>
-      <circle cx="232" cy="88" r="4.2" fill="#b06d7b"/><circle cx="232" cy="88" r="1.4" fill="#e8cbb9"/>
-      <circle cx="184" cy="96" r="5.4" fill="#c98d97"/><circle cx="184" cy="96" r="1.8" fill="#f0d9c8"/>
-      <circle cx="200" cy="112" r="3.6" fill="#b06d7b"/>
-      <circle cx="160" cy="130" r="5" fill="#c98d97"/><circle cx="160" cy="130" r="1.7" fill="#f0d9c8"/>
-      <circle cx="176" cy="146" r="3.8" fill="#b06d7b"/><circle cx="176" cy="146" r="1.3" fill="#e8cbb9"/>
-      <circle cx="136" cy="172" r="4.8" fill="#c98d97"/><circle cx="136" cy="172" r="1.6" fill="#f0d9c8"/>
-      <circle cx="152" cy="188" r="3.4" fill="#b06d7b"/>
-      <circle cx="122" cy="218" r="4.4" fill="#c98d97"/><circle cx="122" cy="218" r="1.5" fill="#f0d9c8"/>
-      <circle cx="138" cy="234" r="3.2" fill="#b06d7b"/>
-      <circle cx="156" cy="246" r="3.8" fill="#c98d97"/><circle cx="156" cy="246" r="1.3" fill="#f0d9c8"/>
-      <circle cx="262" cy="80" r="4.6" fill="#c98d97"/><circle cx="262" cy="80" r="1.5" fill="#f0d9c8"/>
-      <circle cx="298" cy="60" r="3.8" fill="#b06d7b"/>
-      <circle cx="330" cy="50" r="4.4" fill="#c98d97"/><circle cx="330" cy="50" r="1.5" fill="#f0d9c8"/>
-      <circle cx="246" cy="106" r="2.6" fill="#96586a"/>
-      <circle cx="208" cy="140" r="2.4" fill="#96586a"/>
-      <circle cx="146" cy="206" r="2.3" fill="#96586a"/>
-    </g>
-    <!-- perched bird -->
-    <g transform="translate(238,116) rotate(-6)">
-      <path d="M-18,4 L-40,14 L-34,2 Z" fill="#4f6076"/>
-      <ellipse cx="0" cy="0" rx="17" ry="9.5" fill="#6d8299"/>
-      <circle cx="14" cy="-8" r="7" fill="#6d8299"/>
-      <path d="M20,-8 l9,2.4 -9,2.4 Z" fill="#3f4c5c"/>
-      <circle cx="16.5" cy="-9.5" r="1.4" fill="#f1ede6"/>
-      <path d="M-4,-2 C2,-6 8,-6 12,-2 C8,2 2,3 -4,-2 Z" fill="#5c718a"/>
-    </g>
-    <!-- falling petals -->
-    <g fill="#c98d97" opacity=".55">
-      <ellipse cx="196" cy="278" rx="3.4" ry="1.8" transform="rotate(24 196 278)"/>
-      <ellipse cx="238" cy="252" rx="3" ry="1.6" transform="rotate(-30 238 252)"/>
-      <ellipse cx="170" cy="304" rx="2.8" ry="1.5" transform="rotate(12 170 304)"/>
-    </g>
-  </svg>
+  <!-- 4 · UI -->
+  <div class="hero-veil" aria-hidden="true"></div>
   <div class="hero-content wrap">
     <span class="eyebrow">A guide for our guests</span>
     <h1 class="hero-title">Our <em>Yogyakarta</em></h1>
@@ -616,266 +603,123 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 <script>
 /* ============================================================
    EDIT HERE — names in the nav/note/footer markup above; date in
-   the footer. The hero photo lives at assets/hero/merapi-2048.jpg
-   (desktop) and assets/hero/merapi-1200.jpg (phones); the grayscale
-   assets/hero/merapi-flow.jpg marks which of its pixels are cloud
-   and may drift (white = moves, black = pinned still) and must be
-   rebuilt if the photo changes. Composition constants are in
-   HERO_TUNE below. Each place: category + coords [lat,lng].
+   the footer. The hero is assets/joglo-roof-eave.png (desktop) and
+   assets/joglo-roof-eave-820.png (phones), both trimmed so the
+   image's bottom edge IS the eave line — the shadow hinges there,
+   so re-crop rather than pad if you swap the roof. The curtain
+   reads assets/javanese-script.txt. Composition constants are in
+   CURTAIN_TUNE below; the light is aimed from --sun-azimuth /
+   --sun-elevation in :root. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
 
-/* ---- Merapi hero: a living 2.5-D scene. One WebGL pass samples the
-   photograph and sets the photo's own clouds in motion — a feathered
-   flow mask (assets/hero/merapi-flow.jpg) marks the cloud and mist
-   pixels, which are advected downwind with two half-period samples
-   crossfading so the drift loops seamlessly. Wind moves through the
-   foliage, and depth parallax follows the mouse on desktop and
-   tilt/touch on phones. No libraries; if WebGL is missing we fall back
-   to the photo with CSS clouds, and with reduced motion preferred the
-   photo is simply shown still. ---- */
-const HERO_TUNE = {
-  focus:[0.50, 0.42],      /* image point (x,y from top-left) kept centred when cropping */
-  foliageFromY:0.68,       /* the forest ridge — wind + parallax ramp up below this line */
-  twigRightX:0.84,         /* the blurred golden plants along the right edge */
-  twigLeftX:0.16,          /* the grass blades in the lower-left corner */
-  flowDir:[-0.94, -0.06],  /* which way the clouds travel (they stream left off the summit) */
-  flowDist:0.032,          /* how far a cloud drifts per cycle, in image widths */
-  flowPeriod:10.0          /* seconds per crossfade cycle */
+/* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain
+   of Aksara Jawa hangs from its eave, strand by strand, with the roof's own
+   shadow falling across the strands. The corpus is the welcome letter in
+   assets/javanese-script.txt — textural here, so the curtain is aria-hidden
+   and the real heading sits below it. ---- */
+const CURTAIN_TUNE = {
+  /* ---- the hang ---- */
+  strands:44,            /* strands across the doorway */
+  strandsMobile:24,      /* …on phones, where each one costs more to move */
+  glyph:[13,25],         /* per-strand font size, px — varied so it reads hand-hung */
+  lead:[1.02,1.5],       /* per-strand line-height: how tightly its beads are threaded */
+  reach:[.42,1.02],      /* how far down the opening a strand hangs, as a fraction */
+  ink:[.16,.78],         /* per-strand opacity */
+  drop:[0,26],           /* how far below the eave a strand starts, px */
+  jitter:.5              /* sideways wander off the even spacing, in strand-widths */
 };
 
-(function heroScene(){
+(function curtain(){
   const hero = document.querySelector('.hero');
-  const canvas = document.getElementById('hero-canvas');
-  if(!hero || !canvas) return;
+  const host = document.getElementById('curtain');
+  if(!hero || !host) return;
 
-  const small = matchMedia('(max-width:760px)').matches;
-  const SRC = small ? 'assets/hero/merapi-1200.jpg' : 'assets/hero/merapi-2048.jpg';
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const photoEl = hero.querySelector('.hero-photo');
+  /* A fixed seed, so the hang is identical on every load and every resize —
+     the curtain should feel like an object, not a shuffle. */
+  function rng(seed){ return function(){ seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+  const lerp = (a,b,t)=> a + (b-a)*t;
 
-  function cssFallback(withClouds){
-    canvas.remove();
-    photoEl.style.backgroundImage = `url('${SRC}')`;
-    hero.classList.add('photo-hero');
-    if(withClouds && !still){
-      const holder = document.createElement('div');
-      holder.className = 'hero-clouds'; holder.setAttribute('aria-hidden','true');
-      [[9,58,-6],[24,74,-32],[16,90,-58]].forEach(([top,dur,delay])=>{
-        const c = document.createElement('div'); c.className = 'hero-cloud';
-        c.style.top = top+'%'; c.style.animationDuration = dur+'s'; c.style.animationDelay = delay+'s';
-        holder.appendChild(c);
-      });
-      photoEl.after(holder);
+  /* Javanese stacks vowel signs and pangkon onto its consonants, so the
+     curtain has to hang whole grapheme clusters — splitting on code points
+     would strand the marks. (CSS text-orientation:upright would break the
+     same way, which is why each cluster gets its own box instead.) */
+  function toClusters(s){
+    if(typeof Intl !== 'undefined' && Intl.Segmenter){
+      try{ return Array.from(new Intl.Segmenter('jv', {granularity:'grapheme'}).segment(s), x => x.segment); }
+      catch(e){}
     }
+    try{ return s.match(/\P{M}\p{M}*|\p{M}+/gu) || []; }
+    catch(e){ return Array.from(s); }
   }
 
-  if(still){ cssFallback(false); return; }
+  let clusters = [];
 
-  const gl = canvas.getContext('webgl', {alpha:false, antialias:false, depth:false, stencil:false, powerPreference:'low-power'});
-  if(!gl){ cssFallback(true); return; }
+  function build(){
+    if(!clusters.length) return;
+    const w = hero.clientWidth, h = host.clientHeight;
+    if(!w || !h) return;
 
-  const FRAG = `
-precision highp float;
-uniform sampler2D u_tex, u_mask;
-uniform vec2 u_res, u_off, u_scale, u_par;
-uniform float u_time;
+    const n = matchMedia('(max-width:760px)').matches ? CURTAIN_TUNE.strandsMobile : CURTAIN_TUNE.strands;
+    const rand = rng(0x5EED1A);
+    const step = 100 / n;
+    const frag = document.createDocumentFragment();
+    let ci = 0;
 
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float vnoise(vec2 p){
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-float fbm(vec2 p){
-  float v = 0.0, a = 0.5;
-  for(int i = 0; i < 4; i++){ v += a * vnoise(p); p = p * 2.03 + vec2(19.7, 7.3); a *= 0.5; }
-  return v;
-}
+    for(let i = 0; i < n; i++){
+      const el = document.createElement('div');
+      el.className = 'strand';
+      const fs = Math.round(lerp(CURTAIN_TUNE.glyph[0], CURTAIN_TUNE.glyph[1], rand()));
+      const lh = lerp(CURTAIN_TUNE.lead[0], CURTAIN_TUNE.lead[1], rand());
+      const dy = Math.round(lerp(CURTAIN_TUNE.drop[0], CURTAIN_TUNE.drop[1], rand()));
+      const reach = lerp(CURTAIN_TUNE.reach[0], CURTAIN_TUNE.reach[1], rand());
+      const count = Math.max(3, Math.round((h - dy) * reach / (fs * lh)));
+      const x = step * (i + .5) + (rand() - .5) * step * CURTAIN_TUNE.jitter;
 
-void main(){
-  /* screen uv with y = 0 at the top, then the cover-fit window into the
-     photo, breathing very slowly like a long exhale */
-  vec2 suv = vec2(gl_FragCoord.x / u_res.x, 1.0 - gl_FragCoord.y / u_res.y);
-  float breathe = 1.0 + 0.012 * sin(u_time * 0.05);
-  vec2 uv = u_off + (0.5 + (suv - 0.5) / breathe) * u_scale;
+      el.style.setProperty('--x', x.toFixed(3) + '%');
+      el.style.setProperty('--fs', fs + 'px');
+      el.style.setProperty('--lh', lh.toFixed(3));
+      el.style.setProperty('--dy', dy + 'px');
+      el.style.setProperty('--op', lerp(CURTAIN_TUNE.ink[0], CURTAIN_TUNE.ink[1], rand()).toFixed(3));
 
-  /* depth: 0 = sky and summit, 1 = the near foliage */
-  float twigR = smoothstep(${f(HERO_TUNE.twigRightX)}, ${f(HERO_TUNE.twigRightX + 0.10)}, uv.x) * smoothstep(0.18, 0.32, uv.y);
-  float twigL = (1.0 - smoothstep(${f(HERO_TUNE.twigLeftX - 0.10)}, ${f(HERO_TUNE.twigLeftX)}, uv.x)) * smoothstep(0.56, 0.72, uv.y);
-  float twigs = max(twigR, twigL);
-  float depth = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.98, uv.y), twigs * 0.95);
-
-  /* parallax: the foreground leans away from the pointer, the sky drifts
-     gently with it — a window into the valley rather than a flat print */
-  vec2 poff = u_par * (0.30 - depth) * vec2(0.016, 0.010);
-
-  /* wind: slow gusts plus a fine leaf flutter — strongest in the blurred
-     near plants, gentler across the forest, patchy so the canopies
-     shiver rather than the hillside sliding */
-  float windm = max(smoothstep(${f(HERO_TUNE.foliageFromY)}, 0.88, uv.y) * 0.7, twigs);
-  float patch = 0.55 + 0.45 * vnoise(uv * vec2(9.0, 7.0));
-  float gust = fbm(vec2(uv.x * 2.2 - u_time * 0.24, uv.y * 2.0)) - 0.47;
-  float flutter = sin(u_time * 2.4 + uv.x * 34.0 + uv.y * 27.0) * 0.30;
-  vec2 woff = vec2(gust * 1.5 + flutter, gust * 0.35) * 0.0042 * windm * patch * (0.35 + 0.65 * depth);
-
-  /* the photograph's own clouds, set adrift: the flow mask marks cloud
-     and mist pixels, which slide downwind. Two samples half a cycle
-     apart crossfade, so each one carries weight only near the middle of
-     its travel and the loop never visibly resets. A slow churn breathes
-     through the mask so the drift billows instead of gliding rigidly. */
-  vec2 base = uv + poff + woff;
-  float cm = texture2D(u_mask, uv).r;
-  vec2 fdir = vec2(${f(HERO_TUNE.flowDir[0])}, ${f(HERO_TUNE.flowDir[1])}) * ${f(HERO_TUNE.flowDist)};
-  float ph1 = fract(u_time / ${f(HERO_TUNE.flowPeriod)});
-  float ph2 = fract(ph1 + 0.5);
-  vec2 churn = vec2(fbm(uv * 5.0 + u_time * 0.050) - 0.5,
-                    fbm(uv * 5.0 + vec2(8.3, 2.7) - u_time * 0.045) - 0.5) * 0.014;
-  vec3 s1 = texture2D(u_tex, base + (fdir * (ph1 - 0.5) + churn) * cm).rgb;
-  vec3 s2 = texture2D(u_tex, base + (fdir * (ph2 - 0.5) + churn) * cm).rgb;
-  vec3 col = mix(s1, s2, abs(ph1 * 2.0 - 1.0));
-
-  gl_FragColor = vec4(col, 1.0);
-}`;
-  function f(x){ return x.toFixed(4); }
-
-  function shader(type, src){
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src); gl.compileShader(s);
-    return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
-  }
-  const vs = shader(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }');
-  const fs = shader(gl.FRAGMENT_SHADER, FRAG);
-  if(!vs || !fs){ cssFallback(true); return; }
-  const prog = gl.createProgram();
-  gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ cssFallback(true); return; }
-  gl.useProgram(prog);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-  const locP = gl.getAttribLocation(prog, 'p');
-  gl.enableVertexAttribArray(locP);
-  gl.vertexAttribPointer(locP, 2, gl.FLOAT, false, 0, 0);
-
-  const U = {};
-  ['u_res','u_off','u_scale','u_par','u_time','u_tex','u_mask'].forEach(n=>{ U[n] = gl.getUniformLocation(prog, n); });
-
-  function upload(unit, source){
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    if(source) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
-    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0]));
-  }
-
-  const img = new Image(), maskImg = new Image();
-  img.decoding = maskImg.decoding = 'async';
-  let pending = 2;
-  const arrived = ()=>{ if(--pending === 0) start(); };
-  img.onload = arrived;
-  img.onerror = ()=>{ canvas.remove(); }; /* keep the illustrated scene */
-  /* a missing mask only stills the clouds — the rest of the scene runs */
-  maskImg.onload = arrived;
-  maskImg.onerror = ()=>{ maskImg.failed = true; arrived(); };
-  img.src = SRC;
-  maskImg.src = 'assets/hero/merapi-flow.jpg';
-
-  let running = false, visible = true, raf = 0;
-  let px = 0, py = 0, tx = 0, ty = 0, last = 0;
-  const t0 = performance.now();
-
-  function fit(){
-    const dpr = Math.min(devicePixelRatio || 1, 1.75);
-    canvas.width = Math.max(1, Math.round(hero.clientWidth * dpr));
-    canvas.height = Math.max(1, Math.round(hero.clientHeight * dpr));
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    const ZOOM = 1.07, M = 0.022;
-    const s = Math.max(canvas.width / img.width, canvas.height / img.height) * ZOOM;
-    const vx = canvas.width / (img.width * s), vy = canvas.height / (img.height * s);
-    const cx = Math.min(Math.max(HERO_TUNE.focus[0], vx / 2 + M), 1 - vx / 2 - M);
-    const cy = Math.min(Math.max(HERO_TUNE.focus[1], vy / 2 + M), 1 - vy / 2 - M);
-    gl.uniform2f(U.u_res, canvas.width, canvas.height);
-    gl.uniform2f(U.u_off, cx - vx / 2, cy - vy / 2);
-    gl.uniform2f(U.u_scale, vx, vy);
-  }
-
-  function frame(now){
-    raf = 0;
-    if(!running || !visible) return;
-    const dt = Math.min((now - last) / 1000, 0.1); last = now;
-    /* pointer eases toward its target; a slow figure-eight keeps the
-       scene alive when nobody is touching it */
-    const t = (now - t0) / 1000;
-    const ix = Math.sin(t * 0.11) * 0.22, iy = Math.cos(t * 0.07) * 0.14;
-    const k = 1 - Math.exp(-dt * 2.4);
-    px += (Math.max(-1, Math.min(1, tx + ix)) - px) * k;
-    py += (Math.max(-1, Math.min(1, ty + iy)) - py) * k;
-    gl.uniform2f(U.u_par, px, py);
-    gl.uniform1f(U.u_time, t);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    raf = requestAnimationFrame(frame);
-  }
-  function wake(){ if(running && visible && !raf){ last = performance.now(); raf = requestAnimationFrame(frame); } }
-
-  function start(){
-    upload(0, img);
-    upload(1, maskImg.failed ? null : maskImg);
-    gl.uniform1i(U.u_tex, 0);
-    gl.uniform1i(U.u_mask, 1);
-    fit();
-    running = true; wake();
-    canvas.classList.add('on');
-    hero.classList.add('photo-hero');
-  }
-
-  addEventListener('resize', ()=>{ if(running) fit(); }, {passive:true});
-  let onScreen = true;
-  document.addEventListener('visibilitychange', ()=>{ visible = onScreen && !document.hidden; wake(); });
-  new IntersectionObserver(es=>{
-    es.forEach(e=>{ onScreen = e.isIntersecting; visible = onScreen && !document.hidden; wake(); });
-  }).observe(hero);
-
-  /* desktop: the scene follows the mouse */
-  addEventListener('mousemove', e=>{
-    tx = (e.clientX / innerWidth) * 2 - 1;
-    ty = (e.clientY / innerHeight) * 2 - 1;
-  }, {passive:true});
-
-  /* phones: follow a finger moving over the hero… */
-  hero.addEventListener('touchmove', e=>{
-    const t = e.touches[0]; if(!t) return;
-    tx = (t.clientX / innerWidth) * 2 - 1;
-    ty = (t.clientY / innerHeight) * 2 - 1;
-  }, {passive:true});
-
-  /* …and the tilt of the device, when the platform allows it */
-  function tilt(e){
-    if(e.gamma == null || e.beta == null) return;
-    if(baseBeta == null) baseBeta = e.beta;
-    tx = Math.max(-1, Math.min(1, e.gamma / 22));
-    ty = Math.max(-1, Math.min(1, (e.beta - baseBeta) / 26));
-  }
-  let baseBeta = null;
-  if(typeof DeviceOrientationEvent !== 'undefined'){
-    if(typeof DeviceOrientationEvent.requestPermission === 'function'){
-      /* iOS wants a gesture first; ask quietly on the first touch */
-      hero.addEventListener('touchend', function ask(){
-        hero.removeEventListener('touchend', ask);
-        DeviceOrientationEvent.requestPermission()
-          .then(st=>{ if(st === 'granted') addEventListener('deviceorientation', tilt, {passive:true}); })
-          .catch(()=>{});
-      }, {passive:true});
-    } else {
-      addEventListener('deviceorientation', tilt, {passive:true});
+      let html = '';
+      for(let g = 0; g < count; g++){
+        html += '<i>' + clusters[ci++ % clusters.length] + '</i>';
+      }
+      el.innerHTML = html;
+      frag.appendChild(el);
     }
+    host.textContent = '';
+    host.appendChild(frag);
   }
 
-  canvas.addEventListener('webglcontextlost', ()=>{ running = false; cssFallback(true); }, false);
+  /* Rebuild on resize only when the box actually changed — mobile browsers fire
+     resize as the URL bar slides away, and rehanging the curtain for that would
+     be both wasteful and visible. */
+  let lastW = 0, lastH = 0, rt;
+  function onResize(){
+    clearTimeout(rt);
+    rt = setTimeout(()=>{
+      const w = hero.clientWidth, h = host.clientHeight;
+      if(Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 40) return;
+      lastW = w; lastH = h; build();
+    }, 180);
+  }
+  addEventListener('resize', onResize, {passive:true});
+  addEventListener('orientationchange', onResize, {passive:true});
+
+  fetch('assets/javanese-script.txt')
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(text => {
+      /* drop the machine-translation credit on the last line, and the zero-width
+         spaces scattered through the letter */
+      const lines = text.split('\n').filter(l => l.trim());
+      const body = lines.slice(0, -1).join(' ').replace(/​/g, '');
+      clusters = toClusters(body).filter(c => c.trim());
+      lastW = hero.clientWidth; lastH = host.clientHeight;
+      build();
+    })
+    .catch(()=>{ /* no corpus: the roof, wall and shadow still compose on their own */ });
 })();
 const PLACES = [
   /* COFFEE */

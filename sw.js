@@ -8,7 +8,7 @@
    - Map library + tiles (cross-origin, and useless offline anyway): not cached —
      they go straight to the network and fail gracefully via the in-page handler. */
 
-const VERSION = 'v10';
+const VERSION = 'v11';
 const SHELL_CACHE = `oy-shell-${VERSION}`;
 const FONT_CACHE = `oy-fonts-${VERSION}`;
 
@@ -24,9 +24,9 @@ const SHELL_ASSETS = [
   './icons/apple-touch-icon.png',
   './assets/couple-dogs.png',
   './assets/dogs-running.png',
-  './assets/hero/merapi-2048.jpg',
-  './assets/hero/merapi-1200.jpg',
-  './assets/hero/merapi-flow.jpg',
+  './assets/joglo-roof-eave.png',
+  './assets/joglo-roof-eave-820.png',
+  './assets/javanese-script.txt',
 ];
 
 self.addEventListener('install', (event) => {
