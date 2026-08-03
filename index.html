@@ -42,27 +42,34 @@
      Aim the light from here; every shadow layer is derived from these three.
      The curtain's physics and the wind chime are tuned in CURTAIN_TUNE, at
      the top of the script. */
-  --sun-azimuth:-15deg;   /* which way the light leans the cast shadow */
-  --sun-elevation:.62;    /* 0 = low sun, long shadow · 1 = overhead, short */
+  --sun-azimuth:31deg;    /* which way the light leans the cast shadow */
+  --sun-elevation:.53;    /* 0 = low sun, long shadow · 1 = overhead, short */
   --shadow-ink:#5C3F27;   /* warm umber. The wall is warm, so the shadow is too — never neutral black */
-  --shadow-opacity:.36;   /* the cast shadow overall (0.30–0.42 reads best) */
-  --shadow-contact:.30;   /* the tight, dark line hugging the underside of the eaves */
-  --shadow-dx:-10px; --shadow-dy:0px;   /* small offset applied after the projection */
+  --shadow-opacity:.38;   /* the cast shadow overall (0.30–0.42 reads best) */
+  --shadow-contact:.26;   /* the tight, dark line hugging the underside of the eaves */
+  --shadow-dx:0px; --shadow-dy:0px;     /* small offset applied after the projection */
 
-  /* Where the eave line sits below the top of the frame. The roof keeps its own
-     aspect and hangs its eave here, so the apex crops off the top of the
-     viewport — you are standing under it, not looking at it. Capped at 40vw so
-     the roof always reaches the top edge instead of leaving a gap on narrow
-     screens (its natural height is width / 2.2766, i.e. ~44vw). */
-  --roof-h:min(clamp(150px,31vh,350px), 40vw);
+  /* The roof hangs as an object in the frame with air around it, rather than
+     bleeding to the edges — the silhouette is the point, so it stays whole and
+     the wall is allowed to be empty. Everything else is derived from its width:
+     the eave line is where the curtain hangs from, and the curtain is narrower
+     than the roof so it reads as hanging in a doorway under it. */
+  --roof-w:min(44vw, 620px);
   --roof-aspect:1498 / 658;             /* joglo-roof-eave.png, trimmed to its silhouette */
+  --roof-h:calc(var(--roof-w) * 658 / 1498);
+  --roof-top:clamp(104px,13vh,150px);   /* floats clear of the nav */
+  --eave:calc(var(--roof-top) + var(--roof-h));
+  --curtain-w:calc(var(--roof-w) * .74);
 
   /* Derived: how far the silhouette is thrown down the wall. A lower sun
      (smaller elevation) throws it further. */
   --shadow-len:calc(.86 / var(--sun-elevation));
   --roof-src:url("assets/joglo-roof-eave.png");
 }
-@media(max-width:760px){ :root{ --roof-src:url("assets/joglo-roof-eave-820.png") } }
+@media(max-width:760px){ :root{
+  --roof-src:url("assets/joglo-roof-eave-820.png");
+  --roof-w:min(86vw,420px); --roof-top:clamp(78px,10vh,110px); --curtain-w:calc(var(--roof-w) * .8);
+} }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
 body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
@@ -83,17 +90,14 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* ===== NAV ===== */
 .nav{position:fixed; top:0; left:0; width:100%; z-index:1000; transition:background .5s ease, border-color .5s ease}
 .nav-inner{position:relative; display:flex; align-items:center; justify-content:space-between; height:78px}
-.nav a{text-decoration:none; color:#F3EFE8; transition:color .5s}
+/* The roof floats clear of the nav, so the bar sits on linen the whole way down
+   the page and stays in ink; .solid only draws the background behind it. */
+.nav a{text-decoration:none; color:var(--ink); transition:color .5s}
 .nav-left{font-family:var(--sans); font-size:11px; letter-spacing:.24em; text-transform:uppercase}
 .wordmark{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:var(--serif); font-weight:400; font-size:22px; letter-spacing:.42em; padding-left:.42em; white-space:nowrap}
-.nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid rgba(243,239,232,.5); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
-.nav-btn:hover{background:#F3EFE8; color:var(--ink)}
-/* the nav sits over the roof at the top of the page, so it stays light until
-   it lifts off onto the linen and .solid flips it to ink */
+.nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid var(--line-2); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
+.nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
 .nav.solid{background:var(--surface); border-bottom:1px solid var(--line)}
-.nav.solid a{color:var(--ink)}
-.nav.solid .nav-btn{border-color:var(--line-2)}
-.nav.solid .nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
 @media(max-width:760px){
   .nav-inner{height:64px}
   .nav-left{display:none}
@@ -115,23 +119,29 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    mix-blend-mode, and an isolating ancestor would trap that blending. */
 .hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end; background:var(--surface)}
 
-/* 0 — the wall. Warm light spills in from the doorway below. */
+/* 0 — the wall: warm linen, woven, lit from above where the roof sits. The two
+   repeating gradients are the weave; the grain overlay on <body> does the rest. */
 .wall{position:absolute; inset:0; z-index:0;
   background:
-    radial-gradient(130% 62% at 50% 116%, rgba(255,232,193,.72) 0%, rgba(255,232,193,0) 66%),
-    linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 38%, var(--paper) 100%)}
+    repeating-linear-gradient(90deg, rgba(118,97,68,.085) 0 1px, rgba(118,97,68,0) 1px 3px),
+    repeating-linear-gradient(0deg,  rgba(118,97,68,.07)  0 1px, rgba(118,97,68,0) 1px 3px),
+    radial-gradient(88% 62% at 50% 4%, rgba(255,248,232,.85) 0%, rgba(255,248,232,0) 64%),
+    linear-gradient(180deg, var(--paper) 0%, var(--surface) 46%, var(--surface-2) 100%)}
 
-/* 1 — the curtain. Strands are hung by the script; each one is a column of
-   Javanese grapheme clusters, pivoting from the eave line above it. */
-.curtain{position:absolute; left:0; right:0; bottom:0; z-index:1; overflow:hidden;
-  top:calc(var(--roof-h) - 26px)}          /* tucked up behind the fascia board */
+/* 1 — the curtain, hung in the opening under the roof and narrower than it, so
+   the eaves overhang the strands the way they would over a real doorway.
+   Positioned with left/width rather than a centring transform, because the
+   physics owns .strand's transform and .curtain's must stay free too. */
+.curtain{position:absolute; z-index:1;
+  left:calc(50% - var(--curtain-w) / 2); width:var(--curtain-w);
+  top:calc(var(--eave) - 14px); bottom:0}   /* tucked up behind the fascia board */
 .strand{position:absolute; top:var(--dy); left:var(--x); transform-origin:50% 0;
   transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center;
   font-family:var(--javanese); font-weight:400; color:var(--ink);
   font-size:var(--fs); line-height:var(--lh); opacity:var(--op);
-  pointer-events:none; -webkit-user-select:none; user-select:none}
-.strand i{display:block; font-style:normal}
+  white-space:nowrap; pointer-events:none; -webkit-user-select:none; user-select:none}
+.strand i{display:block; font-style:normal; opacity:var(--g,1)}
 
 /* 2 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
    a mask over a warm umber fill, hinged at the eave line (the asset is trimmed
@@ -144,8 +154,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    the apex is off the top of the screen, but its shadow still has to be thrown
    down the wall, peak first. So the shadow box keeps the image's full aspect
    and pins only its bottom edge to the eave. */
-.rshadow{position:absolute; left:0; width:100%; aspect-ratio:var(--roof-aspect);
-  bottom:calc(100% - var(--roof-h));
+.rshadow{position:absolute; left:calc(50% - var(--roof-w) / 2); top:var(--roof-top);
+  width:var(--roof-w); height:var(--roof-h);
   z-index:2; pointer-events:none; mix-blend-mode:multiply;
   background:var(--shadow-ink);
   -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
@@ -166,15 +176,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    run out on the wall, not get cut off by the bottom of the viewport. Re-aiming
    --sun-elevation lengthens the throw and moves all three together, which is
    correct: a lower sun throws the shadow further. */
-.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 78%, #000 90%, #000 100%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 78%, #000 90%, #000 100%);
-              filter:blur(4px);  opacity:var(--shadow-opacity)}
-.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, #000 72%, #000 84%, transparent 93%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, #000 72%, #000 84%, transparent 93%);
-              filter:blur(18px); opacity:calc(var(--shadow-opacity) * .72)}
-.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 40%, #000 52%, #000 64%, transparent 78%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 40%, #000 52%, #000 64%, transparent 78%);
-              filter:blur(44px); opacity:calc(var(--shadow-opacity) * .45)}
+.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 66%, #000 86%, #000 100%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 66%, #000 86%, #000 100%);
+              filter:blur(2px);  opacity:var(--shadow-opacity)}
+.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 38%, #000 56%, #000 76%, transparent 90%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 38%, #000 56%, #000 76%, transparent 90%);
+              filter:blur(9px); opacity:calc(var(--shadow-opacity) * .74)}
+.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 22%, #000 44%, transparent 64%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 22%, #000 44%, transparent 64%);
+              filter:blur(24px); opacity:calc(var(--shadow-opacity) * .46)}
 
 /* the contact shadow — barely thrown, barely blurred, so the roof reads as
    close to the wall instead of floating in front of it.
@@ -187,27 +197,34 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   filter:blur(6px); opacity:var(--shadow-contact);
   transform:translateY(1px) scaleY(-.075)}
 
-/* 3 — the roof. Same box as the shadow, so mask and image stay welded: full
-   width, its own aspect, eave pinned at --roof-h. The apex crops off the top
-   of the frame — you are standing under the roof, not looking at it. */
-.roof{position:absolute; left:0; width:100%; aspect-ratio:var(--roof-aspect);
-  bottom:calc(100% - var(--roof-h)); z-index:3;
+/* 3 — the roof. Same box as the shadow, so mask and image stay welded. */
+.roof{position:absolute; left:calc(50% - var(--roof-w) / 2); top:var(--roof-top);
+  width:var(--roof-w); height:var(--roof-h); z-index:3;
   background-image:var(--roof-src); background-size:100% 100%;
   background-repeat:no-repeat; pointer-events:none}
 
-/* 4 — UI. A wash of light under the curtain so the heading stays readable
-   where it crosses the strands, and so the composition sits on something. */
-.hero-veil{position:absolute; left:0; right:0; bottom:0; height:52%; z-index:4; pointer-events:none;
-  background:linear-gradient(180deg, rgba(250,247,240,0) 0%, rgba(250,247,240,.34) 46%, rgba(250,247,240,.66) 80%, rgba(250,247,240,.82) 100%)}
+/* 4 — UI. The type keeps to a column beside the doorway rather than sitting on
+   top of it; on phones there isn't room for that, so a wash comes back under
+   the text (see the mobile block below). */
+.hero-veil{position:absolute; left:0; right:0; bottom:0; height:46%; z-index:4; pointer-events:none}
 .hero-content{position:relative; z-index:5; color:var(--ink); padding-bottom:clamp(48px,9vh,110px); width:100%}
+.hero-content > *{max-width:min(30%, 380px)}
 .hero-content .eyebrow{color:var(--muted); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
-.hero-title{margin-top:20px; font-size:clamp(46px,9.5vw,116px); font-weight:300; letter-spacing:-.01em; line-height:1; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
+.hero-title{margin-top:20px; font-size:clamp(38px,4.8vw,72px); font-weight:300; letter-spacing:-.01em; line-height:1.02; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
 .hero-title em{font-style:italic}
-.hero-lede{max-width:440px; margin-top:26px; color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
+.hero-lede{margin-top:24px; color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:15px; line-height:1.75; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
 .hero-link{margin-top:34px; color:var(--ink); opacity:0; transform:translateY(14px); animation:fade 1.3s .75s ease forwards}
 @keyframes fade{to{opacity:1; transform:none}}
 .scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:5; color:var(--muted); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
+@media(max-width:760px){
+  /* No room for a column beside the doorway, so the type sits under it and the
+     curtain is lifted off the words with a wash instead. */
+  .hero-content > *{max-width:none}
+  .hero-lede{max-width:34ch}
+  .hero-veil{height:56%;
+    background:linear-gradient(180deg, rgba(247,243,235,0) 0%, rgba(247,243,235,.62) 40%, rgba(247,243,235,.9) 72%, rgba(247,243,235,.96) 100%)}
+}
 
 /* ===== NOTE — the floating gallery =====
    A tall scroll track with a sticky 100svh stage. The quote stays pinned in the
@@ -629,14 +646,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    and the real heading sits below it. ---- */
 const CURTAIN_TUNE = {
   /* ---- the hang ---- */
-  strands:44,            /* strands across the doorway */
-  strandsMobile:24,      /* …on phones, where each one costs more to move */
-  glyph:[13,25],         /* per-strand font size, px — varied so it reads hand-hung */
-  lead:[1.02,1.5],       /* per-strand line-height: how tightly its beads are threaded */
-  reach:[.42,1.02],      /* how far down the opening a strand hangs, as a fraction */
-  ink:[.16,.78],         /* per-strand opacity */
-  drop:[0,15],           /* how far below the eave a strand starts, px */
-  jitter:.5              /* sideways wander off the even spacing, in strand-widths */
+  strands:46,            /* strands across the doorway */
+  strandsMobile:26,      /* …on phones, where each one costs more to move */
+  glyph:[9,15],          /* per-strand font size, px — varied so it reads hand-hung */
+  lead:[1.0,1.34],       /* per-strand line-height: how tightly its beads are threaded */
+  reach:[.58,1.06],      /* how far down the opening a strand hangs, as a fraction */
+  ink:[.52,1],           /* per-strand opacity */
+  drop:[0,10],           /* how far below the eave a strand starts, px */
+  jitter:.34,            /* sideways wander off the even spacing, in strand-widths */
+  tail:.34               /* fraction of each strand that thins out toward its end */
 };
 
 (function curtain(){
@@ -666,7 +684,7 @@ const CURTAIN_TUNE = {
 
   function build(){
     if(!clusters.length) return;
-    const w = hero.clientWidth, h = host.clientHeight;
+    const w = host.clientWidth, h = host.clientHeight;
     if(!w || !h) return;
 
     const n = matchMedia('(max-width:760px)').matches ? CURTAIN_TUNE.strandsMobile : CURTAIN_TUNE.strands;
@@ -691,9 +709,18 @@ const CURTAIN_TUNE = {
       el.style.setProperty('--dy', dy + 'px');
       el.style.setProperty('--op', lerp(CURTAIN_TUNE.ink[0], CURTAIN_TUNE.ink[1], rand()).toFixed(3));
 
+      /* The last stretch of every strand thins out, so the curtain ends in
+         loose trailing threads instead of a ruled line across the opening.
+         Baked in at build time — nothing here costs anything per frame. */
+      const solid = Math.round(count * (1 - CURTAIN_TUNE.tail));
       let html = '';
       for(let g = 0; g < count; g++){
-        html += '<i>' + clusters[ci++ % clusters.length] + '</i>';
+        const c = clusters[ci++ % clusters.length];
+        if(g < solid) html += '<i>' + c + '</i>';
+        else {
+          const t = (g - solid) / Math.max(1, count - solid);
+          html += '<i style="--g:' + (1 - t * t * .94).toFixed(2) + '">' + c + '</i>';
+        }
       }
       el.innerHTML = html;
       frag.appendChild(el);
@@ -709,7 +736,7 @@ const CURTAIN_TUNE = {
   function onResize(){
     clearTimeout(rt);
     rt = setTimeout(()=>{
-      const w = hero.clientWidth, h = host.clientHeight;
+      const w = host.clientWidth, h = host.clientHeight;
       if(Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 40) return;
       lastW = w; lastH = h; build();
     }, 180);
@@ -725,7 +752,7 @@ const CURTAIN_TUNE = {
       const lines = text.split('\n').filter(l => l.trim());
       const body = lines.slice(0, -1).join(' ').replace(/​/g, '');
       clusters = toClusters(body).filter(c => c.trim());
-      lastW = hero.clientWidth; lastH = host.clientHeight;
+      lastW = host.clientWidth; lastH = host.clientHeight;
       build();
     })
     .catch(()=>{ /* no corpus: the roof, wall and shadow still compose on their own */ });
