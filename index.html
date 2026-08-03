@@ -46,7 +46,7 @@
   --sun-elevation:.62;    /* 0 = low sun, long shadow · 1 = overhead, short */
   --shadow-ink:#5C3F27;   /* warm umber. The wall is warm, so the shadow is too — never neutral black */
   --shadow-opacity:.36;   /* the cast shadow overall (0.30–0.42 reads best) */
-  --shadow-contact:.42;   /* the tight, dark line hugging the underside of the eaves */
+  --shadow-contact:.30;   /* the tight, dark line hugging the underside of the eaves */
   --shadow-dx:-10px; --shadow-dy:0px;   /* small offset applied after the projection */
 
   /* Where the eave line sits below the top of the frame. The roof keeps its own
@@ -124,7 +124,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* 1 — the curtain. Strands are hung by the script; each one is a column of
    Javanese grapheme clusters, pivoting from the eave line above it. */
 .curtain{position:absolute; left:0; right:0; bottom:0; z-index:1; overflow:hidden;
-  top:calc(var(--roof-h) - 12px)}          /* tucked up behind the fascia board */
+  top:calc(var(--roof-h) - 26px)}          /* tucked up behind the fascia board */
 .strand{position:absolute; top:var(--dy); left:var(--x); transform-origin:50% 0;
   transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center;
@@ -158,25 +158,34 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
             scaleY(calc(-1 * var(--shadow-len)))}
 
 /* The band gradients are in the element's own space, where 100% is the eave and
-   0% is the apex — so *lower* percentages are *further* down the wall once the
-   silhouette is flipped. Nearest the eave: tight and dark. Furthest: wide,
-   faint, and faded out well before the bottom of the viewport. */
-.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 62%, #000 76%, #000 100%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 62%, #000 76%, #000 100%);
-              filter:blur(5px);  opacity:var(--shadow-opacity)}
-.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 30%, #000 44%, #000 68%, transparent 80%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 30%, #000 44%, #000 68%, transparent 80%);
-              filter:blur(15px); opacity:calc(var(--shadow-opacity) * .78)}
-.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 16%, #000 34%, transparent 48%);
-              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 16%, #000 34%, transparent 48%);
-              filter:blur(32px); opacity:calc(var(--shadow-opacity) * .52)}
+   0% is the apex — so *lower* percentages sit *further* down the wall once the
+   silhouette is flipped. The three overlap rather than abut, or the change in
+   blur shows up as a seam.
+   With the default sun the throw is ~877px, so these land the penumbra between
+   0 and ~530px below the eave and take it to nothing there — the shadow has to
+   run out on the wall, not get cut off by the bottom of the viewport. Re-aiming
+   --sun-elevation lengthens the throw and moves all three together, which is
+   correct: a lower sun throws the shadow further. */
+.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 78%, #000 90%, #000 100%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 78%, #000 90%, #000 100%);
+              filter:blur(4px);  opacity:var(--shadow-opacity)}
+.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, #000 72%, #000 84%, transparent 93%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, #000 72%, #000 84%, transparent 93%);
+              filter:blur(18px); opacity:calc(var(--shadow-opacity) * .72)}
+.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 40%, #000 52%, #000 64%, transparent 78%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 40%, #000 52%, #000 64%, transparent 78%);
+              filter:blur(44px); opacity:calc(var(--shadow-opacity) * .45)}
 
 /* the contact shadow — barely thrown, barely blurred, so the roof reads as
-   close to the wall instead of floating in front of it */
-.rshadow-contact{-webkit-mask-image:var(--roof-src); mask-image:var(--roof-src);
-  -webkit-mask-size:100% 100%; mask-size:100% 100%;
-  filter:blur(3px); opacity:var(--shadow-contact);
-  transform:translateY(2px) scaleY(-.055)}
+   close to the wall instead of floating in front of it.
+   Its whole silhouette is squeezed into ~21px, so the second mask takes it from
+   solid at the eave to nothing at the bottom of that sliver — without the
+   falloff it ends on a hard line where the near band takes over. */
+.rshadow-contact{
+  -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.55) 62%, #000 100%);
+  mask-image:var(--roof-src), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.55) 62%, #000 100%);
+  filter:blur(6px); opacity:var(--shadow-contact);
+  transform:translateY(1px) scaleY(-.075)}
 
 /* 3 — the roof. Same box as the shadow, so mask and image stay welded: full
    width, its own aspect, eave pinned at --roof-h. The apex crops off the top
@@ -626,7 +635,7 @@ const CURTAIN_TUNE = {
   lead:[1.02,1.5],       /* per-strand line-height: how tightly its beads are threaded */
   reach:[.42,1.02],      /* how far down the opening a strand hangs, as a fraction */
   ink:[.16,.78],         /* per-strand opacity */
-  drop:[0,26],           /* how far below the eave a strand starts, px */
+  drop:[0,15],           /* how far below the eave a strand starts, px */
   jitter:.5              /* sideways wander off the even spacing, in strand-widths */
 };
 
