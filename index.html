@@ -111,14 +111,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* ===== HERO — a doorway on a still, hot afternoon =====
    Layers, back to front:
      0  the wall            .wall
-     1  the text curtain    .curtain  (canvas: a verlet cloth of glyphs)
-     2  the roof's shadow   .rshadow  (multiply, ON the curtain — this is what sells the depth)
+     1  the roof's shadow   .rshadow  (multiply onto the wall)
+     2  the string cloth    .curtain  (canvas)
      3  the roof            .roof
      4  UI                  .hero-veil, .hero-content, .mute, .scrollcue
 
+   The cloth sits ABOVE the shadow: the shadow reads on the wall and through the
+   gaps in the weave, and the glyphs keep one even ink instead of being darkened
+   wherever the shadow crossed them. (Swapping these two z-indexes puts the
+   shadow back on top of the cloth.)
+
    .hero itself must NOT create a stacking context (no z-index, no filter, no
-   opacity): the shadow layers blend with the curtain and the wall through
-   mix-blend-mode, and an isolating ancestor would trap that blending. */
+   opacity): the shadow layers blend with the wall through mix-blend-mode, and an
+   isolating ancestor would trap that blending. */
 .hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end; background:var(--surface)}
 
 /* 0 — the wall: warm linen, woven, lit from above where the roof sits. The two
@@ -130,7 +135,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     radial-gradient(88% 62% at 50% 4%, rgba(255,248,232,.85) 0%, rgba(255,248,232,0) 64%),
     linear-gradient(180deg, var(--paper) 0%, var(--surface) 46%, var(--surface-2) 100%)}
 
-/* 1 — the curtain, hung in the opening under the roof and narrower than it, so
+/* 2 — the cloth, hung in the opening under the roof and narrower than it, so
    the eaves overhang the strands the way they would over a real doorway. The
    cloth itself is drawn on this canvas; pointer-events stay off it so the shove
    is driven from window-level listeners and never blocks a click. */
@@ -138,7 +143,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    the cloth exactly, the edge columns were drawn half outside it and anything
    that swung outward was clipped, which put a hard invisible border down both
    sides of the curtain. */
-.curtain{position:absolute; z-index:1; display:block;
+.curtain{position:absolute; z-index:2; display:block;
   left:calc(50% - var(--curtain-w) / 2 - var(--curtain-pad));
   width:calc(var(--curtain-w) + var(--curtain-pad) * 2);
   top:calc(var(--eave) - 38px);             /* tucked well up behind the fascia board */
@@ -147,7 +152,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   height:calc(100% - var(--eave) + 38px);
   pointer-events:none; touch-action:none}
 
-/* 2 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
+/* 1 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
    a mask over a warm umber fill, hinged at the eave line (the asset is trimmed
    so its bottom edge IS the eave) and thrown down the wall with scaleY(-n).
    The negative scale is the projection — the apex of the roof lands furthest
@@ -160,7 +165,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    and pins only its bottom edge to the eave. */
 .rshadow{position:absolute; left:calc(50% - var(--roof-w) / 2); top:var(--roof-top);
   width:var(--roof-w); height:var(--roof-h);
-  z-index:2; pointer-events:none; mix-blend-mode:multiply;
+  z-index:1; pointer-events:none; mix-blend-mode:multiply;
   background:var(--shadow-ink);
   -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
   -webkit-mask-position:50% 100%, 50% 0; mask-position:50% 100%, 50% 0;
@@ -696,70 +701,46 @@ let CHIME = null;
 
 /* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain
 /* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain of
-   Aksara Jawa hangs from its eave, with the roof's own shadow falling across it.
-   The corpus is the welcome letter in assets/javanese-script.txt — textural
-   here, so the canvas is aria-hidden and the real heading sits below it.
+/* ---- The doorway. A joglo roof hangs at the top of the frame, and beneath it an
+   interactive string cloth of Aksara Jawa: a grid of glyphs, the top row pinned
+   so the rest hangs off it, brushed and dragged by the pointer.
 
-   The cloth is a verlet particle grid after Liam Egan's "Strings"
-   (codepen.io/shubniggurath/pen/ZYpjorm): every glyph is a particle, pinned
-   along the top row, held by distance constraints DOWN each column and ACROSS
-   between neighbours. The horizontal run is what makes it behave as one piece of
-   fabric rather than as a row of unrelated strings — a disturbance travels
-   sideways through the constraints themselves, with no coupling term needed.
-   Each glyph is drawn rotated to lie along the constraint below it, so a column
-   bends along its length instead of pivoting rigidly.
+   This is Liam Egan's "Strings" (codepen.io/shubniggurath/pen/ZYpjorm) with its
+   own numbers: gravity 0.2 and damping 0.99 per frame, five constraint passes,
+   vertical links that may close to 2% of rest and open to 110%, sideways links
+   far slacker at 60% and 400% — that slack is why the hem separates into strands
+   while the pinned top stays a sheet. The pointer both brushes (a radial shove
+   falling off over ~70px) and drags (grabs the nearest glyph within 20px and
+   carries it).
 
-   Two helpers the pen imports (getPointID, smoothstep) are reimplemented here:
-   they are a grid index and the standard smoothstep. ---- */
+   The pen folds gravity in as gravity/delta² and then multiplies through by
+   delta² again, so gravity is really a fixed step per frame and only the pointer
+   force scales with the timestep. Kept as written, on a fixed 60Hz step, so it
+   behaves the same when the frame rate does not.
+
+   Two helpers the pen imports (getPointID, smoothstep) are a grid index and the
+   standard smoothstep, reimplemented here. ---- */
 const CURTAIN_TUNE = {
-  /* ---- the weave ---- */
-  cols:30,               /* glyph columns across the doorway */
-  colsMobile:18,
-  glyph:.82,             /* font size as a multiple of the row spacing. Below 1 the
-                            glyphs sit apart rather than touching, which is what keeps
-                            the weave reading as hung threads and not a page of text */
-  ink:.84,               /* ONE opacity for every glyph. Varying it per column, and
-                            fading each column's last third, made the weave look
-                            blotchy rather than hand-hung */
-  hem:[.74,1],           /* shortest and longest a column hangs, as a fraction */
-  scallop:[2,3],         /* the hem is a smooth wave across the width rather than random
-                            lengths — random ones clump wherever the seed puts them, and
-                            a heavy clump on one side reads as the whole curtain hanging
-                            off centre. Whole numbers of cycles: the hem then meets the
-                            two edges at the same height and each half carries the same
-                            length of cloth, so it cannot be heavier on one side */
+  /* ---- the grid ---- */
+  cols:32,               /* glyph columns across the doorway */
+  colsMobile:20,
+  glyph:.9,              /* font size as a multiple of the row spacing */
+  ink:.84,               /* one opacity for every glyph */
 
-  /* ---- the cloth ---- */
-  gravity:.22,           /* px of fall per step */
-  damping:.99,           /* velocity retained per step */
-  iterations:5,          /* constraint relaxation passes per step */
-  compress:.9,           /* how far a vertical link may close up. The pen allows 2%,
-                            which lets its cloth crumple; a hanging strand is taut under
-                            gravity, and letting these concertina piled the glyphs into
-                            dark seams down the weave */
-  stretch:1.06,          /* …and open out, as a multiple of its rest length */
-  spacerSpring:.3,       /* The sideways links pull toward their rest spacing rather than
-                            clamping to a range, so the columns stay evenly spread instead
-                            of redistributing into tight bands and loose ones.
-                            Crucially they act on the horizontal gap ALONE, and it is
-                            signed: a distance constraint cannot tell a neighbour on the
-                            left from one on the right, so once two columns crossed it
-                            held them happily inside out — which is what drew the dark
-                            seams down the weave. */
-  spacerFloor:.55,       /* neighbours may never come closer than this share of the rest
-                            spacing, so the weave cannot fold through itself */
+  /* ---- the cloth, exactly as the pen has it ---- */
+  gravity:.2,
+  damping:.99,
+  iterations:5,
+  compress:.02,          /* a vertical link may close to this share of its rest length… */
+  stretch:1.1,           /* …and open to this */
+  spacerCompress:.6,     /* the sideways links are far slacker, which is what lets the */
+  spacerStretch:4,       /*   hem separate into strands while the top stays a sheet */
 
   /* ---- the pointer ---- */
-  reachPx:74,            /* radius the pointer pushes within, px */
-  push:3.4,              /* how hard it pushes */
-  breeze:.06,            /* px/step of ambient drift, so it is never quite at rest */
-  wave:.12,              /* how fast the gust's phase advances per column. Kept well under
-                            one cycle across the weave: more than that sets up standing
-                            waves, and the columns bunch into dense bands at the nodes
-                            with thin gaps between. The gust is zero-meaned below, so a
-                            gentle wave costs nothing in balance */
-  drift:.55,             /* degrees the sun's angle wanders, on a very slow sine */
-  hz:60                  /* fixed simulation rate; render still runs per frame */
+  mouseSize:5000,        /* brush reach, as distance SQUARED — about 70px */
+  mouseStrength:4,
+  grabRadius:20,         /* drag: how near you must be to catch a glyph */
+  drift:.55              /* degrees the sun's angle wanders, on a very slow sine */
 };
 
 (function curtain(){
@@ -771,13 +752,11 @@ const CURTAIN_TUNE = {
   const ctx = cv.getContext('2d');
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const DT = 1000 / 60, DD = DT * DT;      /* the pen's delta², held fixed */
   const smoothstep = (a, b, x)=>{ const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const lerp = (a, b, t)=> a + (b - a) * t;
-  function rng(seed){ return function(){ seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
 
-  /* Javanese stacks vowel signs and pangkon onto its consonants, so the curtain
-     has to hang whole grapheme clusters — splitting on code points would strand
-     the marks. */
+  /* Javanese stacks vowel signs and pangkon onto its consonants, so the grid has
+     to carry whole grapheme clusters — splitting on code points strands the marks. */
   function toClusters(s){
     if(typeof Intl !== 'undefined' && Intl.Segmenter){
       try{ return Array.from(new Intl.Segmenter('jv', {granularity:'grapheme'}).segment(s), x => x.segment); }
@@ -789,27 +768,29 @@ const CURTAIN_TUNE = {
 
   let clusters = [];
   let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, pad = 0, clothW = 0;
-  let gust = null;                       /* per-column breeze, rebuilt each step */
   let atlas = null, boxPx = 0;
-  let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0;
-  let onScreen = true, visible = true, warm = false;
-  const ptr = { x:0, y:0, has:false };
-  let tilt = 0, tiltBase = null;
+  let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0, calm = 0;
+  let onScreen = true, visible = true;
+  const mouse = { x:0, y:0, in:false };
+  let grabbed = null;
 
   /* Every distinct cluster is rasterised once at device resolution and stamped
      from there — laying out text per glyph per frame would cost far more than
-     the simulation does. */
+     the cloth does. */
   function buildAtlas(){
     boxPx = Math.ceil(fontPx * 1.6);
+    const root = getComputedStyle(document.documentElement);
+    const fam = root.getPropertyValue('--javanese').trim() || 'serif';
+    const ink = root.getPropertyValue('--ink').trim() || '#2B2924';
     atlas = new Map();
     for(const ch of new Set(clusters)){
       const off = document.createElement('canvas');
       off.width = off.height = Math.ceil(boxPx * dpr);
       const o = off.getContext('2d');
       o.scale(dpr, dpr);
-      o.font = '400 ' + fontPx + 'px ' + getComputedStyle(document.documentElement).getPropertyValue('--javanese').trim();
+      o.font = '400 ' + fontPx + 'px ' + fam;
       o.textAlign = 'center'; o.textBaseline = 'middle';
-      o.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#2B2924';
+      o.fillStyle = ink;
       o.fillText(ch, boxPx / 2, boxPx / 2);
       atlas.set(ch, off);
     }
@@ -827,28 +808,19 @@ const CURTAIN_TUNE = {
     clothW = Math.max(40, w - pad * 2);
     cols = matchMedia('(max-width:760px)').matches ? T.colsMobile : T.cols;
     cellW = clothW / (cols - 1);
-    rows = Math.max(6, Math.round(h / (cellW * .82)));
+    rows = Math.max(6, Math.round(h / cellW) + 1);
     cellH = h / (rows - 1);
     fontPx = Math.max(8, Math.round(cellH * T.glyph));
     buildAtlas();
 
-    const rand = rng(0x5EED1A);
-    gust = new Float64Array(cols);
     P = []; links = [];
+    calm = 0;
+    let ci = 0;
     for(let i = 0; i < cols; i++){
-      /* A smooth scalloped hem: two incommensurate waves across the column index,
-         plus a touch of jitter. Balanced left to right by construction, so the
-         curtain cannot end up visually heavier on one side. */
-      const u = i / Math.max(1, cols - 1);
-      const TAU = Math.PI * 2;
-      const wave = (Math.cos(u * TAU * T.scallop[0]) * .6
-                  + Math.cos(u * TAU * T.scallop[1] + 1) * .4) * .5 + .5;
-      const reach = lerp(T.hem[0], T.hem[1], Math.min(1, Math.max(0, wave + (rand() - .5) * .1)));
-      const endRow = Math.round(rows * reach);
       for(let j = 0; j < rows; j++){
         const x = pad + i * cellW, y = j * cellH;
-        P.push({ x, y, ox:x, oy:y, pinned: j === 0, draw: j < endRow,
-                 ch: clusters[(i + j * cols) % clusters.length], down:null });
+        P.push({ x, y, ox:x, oy:y, ax:0, ay:0, pinned: j === 0,
+                 ch: clusters[ci++ % clusters.length], down:null });
       }
     }
     const id = (i, j)=> i * rows + j;
@@ -856,76 +828,45 @@ const CURTAIN_TUNE = {
       for(let j = 0; j < rows; j++){
         const p = P[id(i, j)];
         if(j < rows - 1){
-          const l = { a:p, b:P[id(i, j+1)], len:cellH, min:cellH * T.compress, max:cellH * T.stretch };
+          const l = { a:p, b:P[id(i, j+1)], len:cellH,
+                      min:cellH * T.compress, max:cellH * T.stretch };
           links.push(l); p.down = l;
         }
         if(i < cols - 1){
           links.push({ a:p, b:P[id(i+1, j)], len:cellW,
-                       spring:T.spacerSpring, floor:cellW * T.spacerFloor });
+                       min:cellW * T.spacerCompress, max:cellW * T.spacerStretch });
         }
       }
     }
     render();
   }
 
-  function simulate(time){
+  function step(){
     const g = T.gravity, d = T.damping;
-    const lean = tilt * T.breeze * 6;
-
-    /* The breeze is a wave travelling across the weave — each column a little
-       further through it — and then the average across all columns is removed.
-       Without that subtraction the wave does not happen to sum to zero over a
-       finite number of columns, so every instant carries a small net push and
-       the whole curtain leans. Zero-meaned, it can ripple but cannot translate,
-       and only a deliberate lean from device tilt moves it bodily. */
-    let mean = 0;
-    for(let i = 0; i < cols; i++){
-      const ph = i * T.wave;
-      const v = Math.sin(time * .31 + ph) * .6
-              + Math.sin(time * .17 + ph * 1.7) * .3
-              + Math.sin(time * .073 + ph * 2.6) * .28;
-      gust[i] = v; mean += v;
-    }
-    mean /= cols;
-    for(let i = 0; i < cols; i++) gust[i] = (gust[i] - mean) * T.breeze + lean;
-
+    let moved = 0;
     for(let k = 0; k < P.length; k++){
       const p = P[k];
-      if(p.pinned) continue;
-      const b = gust[(k / rows) | 0];
+      if(p.pinned){ p.ax = p.ay = 0; continue; }
       const vx = (p.x - p.ox) * d, vy = (p.y - p.oy) * d;
+      const m = Math.abs(vx) + Math.abs(vy); if(m > moved) moved = m;
       p.ox = p.x; p.oy = p.y;
-      p.x += vx + b;
-      p.y += vy + g;
+      /* gravity is a flat step per frame; only the pointer force carries delta² */
+      p.x += vx + p.ax * DD;
+      p.y += vy + g + p.ay * DD;
+      p.ax = p.ay = 0;
     }
-    /* Alternate the sweep direction each pass. Relaxing the links in a fixed
-       order is Gauss-Seidel: corrections propagate the way the list is walked,
-       so a left-to-right sweep quietly pushes displacement toward the right-hand
-       end and the whole weave sits off centre. Reversing every other pass
-       cancels that without the cost of reshuffling the list. */
+    /* The pen's cloth has no wind: once it has hung itself it is genuinely
+       still, and simulating a motionless sheet every frame is pure waste. Park
+       the physics when nothing is moving; the pointer wakes it instantly, and
+       the loop keeps turning for the shadow's drift, which costs one style
+       write every fourth frame. */
+    calm = moved < .01 ? calm + 1 : 0;
     for(let it = 0; it < T.iterations; it++){
-      const fwd = (it & 1) === 0;
-      for(let n = 0; n < links.length; n++){
-        const k = fwd ? n : links.length - 1 - n;
+      for(let k = 0; k < links.length; k++){
         const l = links[k], p1 = l.a, p2 = l.b;
         const dx = p2.x - p1.x, dy = p2.y - p1.y;
         const dist = Math.hypot(dx, dy);
         if(dist === 0) continue;
-        if(l.spring){
-          /* horizontal only, and signed — columns keep their left-to-right order
-             and their spacing, while staying free to swing and shear vertically */
-          let gap = p2.x - p1.x;
-          const corr = (l.len - gap) * .5 * l.spring;
-          if(!p1.pinned) p1.x -= corr;
-          if(!p2.pinned) p2.x += corr;
-          gap = p2.x - p1.x;
-          if(gap < l.floor){
-            const fix = (l.floor - gap) * .5;
-            if(!p1.pinned) p1.x -= fix;
-            if(!p2.pinned) p2.x += fix;
-          }
-          continue;
-        }
         let target = l.len;
         if(dist < l.min) target = l.min;
         else if(dist > l.max) target = l.max;
@@ -941,17 +882,15 @@ const CURTAIN_TUNE = {
   function render(){
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.globalAlpha = T.ink;
     const half = boxPx / 2;
-    ctx.globalAlpha = T.ink;              /* one alpha for the whole weave */
     for(let k = 0; k < P.length; k++){
       const p = P[k];
-      if(!p.draw) continue;
       const img = atlas.get(p.ch);
       if(!img) continue;
       let cos = 1, sin = 0;
       if(p.down){
-        const dx = p.down.b.x - p.x, dy = p.down.b.y - p.y;
-        const ang = Math.atan2(dy, dx) - Math.PI / 2;
+        const ang = Math.atan2(p.down.b.y - p.y, p.down.b.x - p.x) - Math.PI / 2;
         cos = Math.cos(ang); sin = Math.sin(ang);
       }
       ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * p.x, dpr * p.y);
@@ -964,93 +903,89 @@ const CURTAIN_TUNE = {
   function frame(now){
     raf = 0;
     if(!visible || !P.length) return;
-    const dt = 1 / T.hz;
-    acc += Math.min(.25, (now - last) / 1000);
+    acc += Math.min(200, now - last);
     last = now;
-    const time = (now - t0) / 1000;
-    let steps = 0;
-    while(acc >= dt && steps < 4){ simulate(time); acc -= dt; steps++; }
-    if(steps) render();
+    let n = 0;
+    while(acc >= DT && n < 4){ if(calm > 24){ acc = 0; break; } step(); acc -= DT; n++; }
+    if(n) render();
 
-    /* The sun wanders a fraction of a degree. Written on .hero every fourth
-       frame and inherited by all four shadow layers — the sine is far too slow
-       to need more, and it keeps the style recalc off the hot path. */
+    /* the sun wanders a fraction of a degree; written on .hero every fourth frame
+       and inherited by all four shadow layers, which keeps the recalc off the
+       hot path */
     if((ticks++ & 3) === 0){
+      const t = (now - t0) / 1000;
       hero.style.setProperty('--shadow-drift',
-        (Math.sin(time * .085) * T.drift + Math.sin(time * .031) * T.drift * .45).toFixed(3) + 'deg');
+        (Math.sin(t * .085) * T.drift + Math.sin(t * .031) * T.drift * .45).toFixed(3) + 'deg');
     }
     raf = requestAnimationFrame(frame);
   }
-
   function wake(){
     if(still || raf || !visible || !P.length) return;
     last = performance.now();
     if(!t0) t0 = last;
-    acc = 0; warm = true;
+    acc = 0;
     raf = requestAnimationFrame(frame);
   }
-  function sleep(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } warm = false; }
-  /* With reduced motion the cloth is dropped into place once and then held, so
-     the hero is still a finished composition rather than a rigid lattice. */
+  function sleep(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
   function settleOrRun(){
-    if(still){ for(let i = 0; i < 110; i++) simulate(0); render(); }
+    /* with reduced motion the cloth is dropped into place once and then held, so
+       the hero is still a finished composition rather than a rigid lattice */
+    if(still){ for(let i = 0; i < 240; i++) step(); render(); }
     else wake();
   }
 
-  /* the pointer pushes the cloth away from itself, falling off smoothly with
-     distance — the same radial shove the pen uses */
-  function shove(clientX, clientY){
-    if(still || !P.length) return;
-    const r = cv.getBoundingClientRect();   /* read here, never inside frame() */
-    const x = clientX - r.left, y = clientY - r.top;
-    ptr.x = x; ptr.y = y; ptr.has = true;
-    const R2 = T.reachPx * T.reachPx;
+  /* ---- brush and drag ---- */
+  function at(e){
+    const r = cv.getBoundingClientRect();     /* read here, never inside frame() */
+    mouse.x = e.clientX - r.left;
+    mouse.y = e.clientY - r.top;
+    mouse.in = true;
+  }
+  function brush(){
+    const R2 = T.mouseSize;
     for(let k = 0; k < P.length; k++){
       const p = P[k];
       if(p.pinned) continue;
-      const dx = p.x - x, dy = p.y - y;
+      const dx = mouse.x - p.x, dy = mouse.y - p.y;
       const ls = dx * dx + dy * dy;
-      if(ls > R2) continue;
-      const s = smoothstep(R2, 0, ls) * T.push / Math.max(8, Math.sqrt(ls));
-      p.x += dx * s; p.y += dy * s;
+      if(ls >= R2) continue;
+      const a = Math.atan2(dy, dx) - Math.PI;         /* away from the pointer */
+      const s = smoothstep(R2, -2000, ls) * T.mouseStrength / 300;
+      p.ax += Math.cos(a) * s;
+      p.ay += Math.sin(a) * s;
     }
+  }
+  function down(e){
+    if(still) return;
+    at(e);
+    for(let k = 0; k < P.length; k++){
+      const p = P[k];
+      const dx = mouse.x - p.x, dy = mouse.y - p.y;
+      if(dx * dx + dy * dy < T.grabRadius * T.grabRadius){
+        grabbed = p; grabbed.wasPinned = p.pinned; p.pinned = true; break;
+      }
+    }
+  }
+  function up(){
+    if(grabbed){ grabbed.pinned = grabbed.wasPinned; grabbed = null; }
+  }
+  function move(e){
+    if(still || !P.length) return;
+    if(e.clientY > hero.getBoundingClientRect().bottom){ mouse.in = false; return; }
+    at(e);
+    if(grabbed){ grabbed.x = mouse.x; grabbed.y = mouse.y; grabbed.ox = mouse.x; grabbed.oy = mouse.y; }
+    brush();
+    calm = 0;
     wake();
-    if(CHIME) CHIME.gesture(Math.min(1, Math.max(0, (x - pad) / clothW)));
+    if(CHIME) CHIME.brush(Math.min(1, Math.max(0, (mouse.x - pad) / clothW)), mouse.x);
   }
 
-  addEventListener('pointermove', e=>{
-    if(e.pointerType === 'touch') return;
-    if(e.clientY > hero.getBoundingClientRect().bottom){ ptr.has = false; return; }
-    shove(e.clientX, e.clientY);
-  }, {passive:true});
-  hero.addEventListener('touchmove', e=>{
-    const t = e.touches[0]; if(!t) return;
-    shove(t.clientX, t.clientY);
-  }, {passive:true});
-  hero.addEventListener('touchend', ()=>{ ptr.has = false; if(CHIME) CHIME.rest(); }, {passive:true});
-
-  /* Tilting the phone leans the curtain. iOS only hands out orientation after a
-     gesture and an explicit grant, so ask on the first touch rather than on
-     load — a permission sheet before someone has seen the page is worse than
-     not having the effect at all. */
-  function onTilt(e){
-    if(e.gamma == null || still) return;
-    if(tiltBase === null) tiltBase = e.gamma;
-    const g = (e.gamma - tiltBase) / 24;
-    tilt = g < -1 ? -1 : g > 1 ? 1 : g;
-  }
-  if(typeof DeviceOrientationEvent !== 'undefined' && !still){
-    if(typeof DeviceOrientationEvent.requestPermission === 'function'){
-      hero.addEventListener('touchend', function ask(){
-        hero.removeEventListener('touchend', ask);
-        DeviceOrientationEvent.requestPermission()
-          .then(st => { if(st === 'granted') addEventListener('deviceorientation', onTilt, {passive:true}); })
-          .catch(()=>{});
-      }, {passive:true});
-    } else {
-      addEventListener('deviceorientation', onTilt, {passive:true});
-    }
-  }
+  addEventListener('pointermove', e=>{ if(e.pointerType !== 'touch') move(e); }, {passive:true});
+  addEventListener('pointerdown', e=>{ if(e.pointerType !== 'touch') down(e); }, {passive:true});
+  addEventListener('pointerup', up, {passive:true});
+  hero.addEventListener('touchstart', e=>{ const t = e.touches[0]; if(t) down(t); }, {passive:true});
+  hero.addEventListener('touchmove', e=>{ const t = e.touches[0]; if(t) move(t); }, {passive:true});
+  hero.addEventListener('touchend', ()=>{ up(); mouse.in = false; if(CHIME) CHIME.rest(); }, {passive:true});
 
   document.addEventListener('visibilitychange', ()=>{
     visible = onScreen && !document.hidden;
@@ -1066,8 +1001,8 @@ const CURTAIN_TUNE = {
   io.observe(hero);
 
   /* Rebuild on resize only when the box actually changed — mobile browsers fire
-     resize as the URL bar slides away, and rehanging the curtain for that would
-     be both wasteful and visible. */
+     resize as the URL bar slides away, and reweaving for that would be both
+     wasteful and visible. */
   let lastW = 0, lastH = 0, rt;
   function onResize(){
     clearTimeout(rt);
@@ -1120,8 +1055,8 @@ const CHIME_TUNE = {
      after `stride` more pixels, so brushing the curtain gives you a note rather
      than a stream. Reading the cloth's own motion instead put a note on every
      ripple, which is far too many for a hand that moved once. */
-  restMs:150,            /* ms of stillness that ends a gesture and re-arms the first note */
-  stride:230,            /* px of continuous travel before a long sweep sounds again */
+  restMs:140,            /* ms of stillness that ends a brush and re-arms the first note */
+  stride:170,            /* px of continuous travel before a sustained brush sounds again */
   voices:6,              /* concurrent cap; the quietest gets stolen */
 
   /* ---- the bus ---- */
@@ -1144,7 +1079,6 @@ const CHIME_TUNE = {
     ? matchMedia('(prefers-reduced-motion: reduce)').matches
     : store.muted;
   let lastMove = 0, lastX = 0, travel = 0;   /* gesture tracking */
-  const spanPx = 600;                        /* converts the 0..1 position back to travel in px */
 
   /* one frequency per scale degree, climbing left to right across the opening */
   const steps = C.slendro.length * C.octaves;
@@ -1227,16 +1161,18 @@ const CHIME_TUNE = {
 
   /* Called on every pointer move. Decides whether this movement has earned a
      note; the synthesis below only runs when it has. */
-  function gesture(pos){
+  /* Called straight off every pointer move, and played the instant it fires —
+     nothing is queued or scheduled ahead, so the note lands with the brush. */
+  function brush(pos, px){
     if(muted || !ctx || ctx.state !== 'running') return;
     const t = performance.now();
     let fire = false;
-    if(t - lastMove > C.restMs){ travel = 0; fire = true; }   /* a new gesture */
+    if(t - lastMove > C.restMs){ travel = 0; fire = true; }   /* a fresh brush */
     else {
-      travel += Math.abs(pos - lastX) * spanPx;
-      if(travel >= C.stride){ travel = 0; fire = true; }      /* still sweeping */
+      travel += Math.abs(px - lastX);
+      if(travel >= C.stride){ travel = 0; fire = true; }      /* still brushing */
     }
-    lastMove = t; lastX = pos;
+    lastMove = t; lastX = px;
     if(fire) strike(pos);
   }
   function rest(){ lastMove = 0; travel = 0; }
@@ -1321,7 +1257,7 @@ const CHIME_TUNE = {
     if(ctx && ctx.state !== 'closed'){ try{ ctx.close(); }catch(e){} }
   }, {once:true});
 
-  CHIME = { gesture, rest };
+  CHIME = { brush, rest };
 })();
 
 const PLACES = [
