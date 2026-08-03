@@ -223,6 +223,19 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 @keyframes fade{to{opacity:1; transform:none}}
 .scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:5; color:var(--muted); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
+/* the chime toggle — three struck bars that drop when it is off */
+.mute{position:absolute; right:var(--gutter); bottom:30px; z-index:5;
+  display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:8px 2px;
+  background:none; border:0; cursor:pointer; color:var(--muted);
+  font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+  transition:color .35s}
+.mute:hover{color:var(--ink)}
+.mute-i{display:inline-flex; align-items:flex-start; gap:3px; height:14px}
+.mute-i i{display:block; width:1px; background:currentColor; height:14px; transform-origin:50% 0;
+  transition:height .35s ease, opacity .35s ease}
+.mute-i i:nth-child(2){height:10px} .mute-i i:nth-child(3){height:12px}
+.mute.off .mute-i i{height:4px; opacity:.5}
+@media(max-width:760px){ .mute{bottom:22px; font-size:10px; letter-spacing:.14em} }
 @media(max-width:760px){
   /* No room for a column beside the doorway, so the type sits under it and the
      curtain is lifted off the words with a wash instead. */
@@ -514,6 +527,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <p class="hero-lede">The coffee we start our mornings with, the bars we end our evenings in, and the tables we would cross the city for — gathered here for you.</p>
     <a class="hero-link link-u" href="#explore">Explore the guide <span>&rarr;</span></a>
   </div>
+  <button class="mute" id="mute" type="button" aria-pressed="false">
+    <span class="mute-i" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="mute-t">Chime on</span>
+  </button>
   <a class="scrollcue" href="#note" aria-label="Scroll down">&darr;</a>
 </header>
 
@@ -644,6 +661,22 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    --sun-elevation in :root. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
+
+/* guest identity + their recommendations, remembered on this device */
+const store = {
+  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
+  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
+  get name(){ return this.read('oy_name',''); },
+  set name(v){ this.write('oy_name', v); },
+  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
+  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
+  get muted(){ return this.read('oy_mute','')==='1'; },
+  set muted(v){ this.write('oy_mute', v?'1':''); },
+  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
+  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
+};
+
+let CHIME = null;
 
 /* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain
    of Aksara Jawa hangs from its eave, strand by strand, with the roof's own
@@ -783,7 +816,7 @@ const CURTAIN_TUNE = {
       frag.appendChild(el);
       built.push({ el, segs, lens, x, dy, op, joints,
                    phase: rand() * Math.PI * 2,
-                   nodes:null, lastLift:-1 });
+                   nodes:null, lastLift:-1, ang:0, rate:0 });
     }
 
     host.textContent = '';
@@ -866,6 +899,24 @@ const CURTAIN_TUNE = {
           const diff = (d - s.lens[k-1]) / d;
           c.x -= dx * diff; c.y -= dy * diff;
         }
+      }
+
+      /* Ring on the strand's angular velocity — the whole strand's, anchor to
+         tip, not the shoulder joint's. The shoulder is the stiffest point on a
+         pinned chain: measured there, a hard sweep barely reads higher than the
+         idle breeze, because the sweep's energy lives in the lower segments.
+         Measured against the fixed step, so the rate doesn't change with frame
+         rate. Rising through the threshold fires once per swing instead of
+         continuously, which is why a hard sweep scatters notes rather than
+         machine-gunning them — and why every note belongs to a strand you can
+         watch move. */
+      if(CHIME){
+        const tip = nodes[L];
+        const w = Math.atan2(-(tip.x - nodes[0].x), Math.max(1, tip.y - nodes[0].y));
+        const rate = Math.abs(w - s.ang) / dt;
+        s.ang = w;
+        if(rate >= CHIME_TUNE.threshold && s.rate < CHIME_TUNE.threshold) CHIME.strike(i, strands.length, rate);
+        s.rate = rate;
       }
     }
   }
@@ -1016,6 +1067,219 @@ const CURTAIN_TUNE = {
     })
     .catch(()=>{ /* no corpus: the roof, wall and shadow still compose on their own */ });
 })();
+/* ---- The wind chime. Synthesised, no files: each voice is a short filtered
+   noise burst for the strike, plus four inharmonic partials at struck-bar
+   ratios, each decaying at its own rate so the highs die away first and the
+   fundamental rings on underneath. Nothing is created until you touch the
+   page — the context is built on the first gesture and never before. ---- */
+const CHIME_TUNE = {
+  /* ---- tuning ---- */
+  root:466,              /* Hz — the fundamental of the leftmost strand */
+  octaves:2,             /* how far the scale climbs across the curtain */
+  slendro:[0,231,474,717,955],   /* cents. Sléndro's five steps are near-equal but
+                                    NOT equal, and that irregularity is the whole
+                                    character — spacing them evenly would just be
+                                    5-tone equal temperament, which sounds synthetic
+                                    and belongs to no gamelan. */
+  partials:[1,2.76,5.40,8.93],   /* struck-bar ratios: inharmonic, so it reads as metal rather than a flute */
+  decays:[4.2,1.5,.8,.42],       /* s, per partial — highs die first. The ramp reaches
+                                    -80dB at these times, so the fundamental stays audible
+                                    for roughly 2.5-3s, which is the ring the brief asks for */
+
+  /* ---- when a strand rings ---- */
+  threshold:.75,         /* rad/s of whole-strand swing. Measured: silent at rest,
+                            one note on a slow drift, ~25 notes across 11 strands
+                            on a hard sweep — a scatter, not a burst */
+  cooldown:180,          /* ms before the same strand can ring again */
+  voices:6,              /* concurrent cap; the quietest gets stolen */
+
+  /* ---- the bus ---- */
+  strike:.014,           /* length of the noise transient, s */
+  reverbMix:.26,
+  masterGain:.5
+};
+
+(function chime(){
+  const btn = document.getElementById('mute');
+  if(!btn) return;
+
+  const C = CHIME_TUNE;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx = null, bus = null, master = null, noise = null;
+  let voices = [];
+  /* With reduced motion the curtain never moves, so nothing would ring anyway —
+     but the toggle should also READ as off, and stay off, until asked otherwise. */
+  let muted = store.read('oy_mute', null) === null
+    ? matchMedia('(prefers-reduced-motion: reduce)').matches
+    : store.muted;
+  const lastRing = Object.create(null);   /* per-strand cooldown clock */
+
+  /* one frequency per scale degree, climbing left to right across the opening */
+  const steps = C.slendro.length * C.octaves;
+  const pitches = [];
+  for(let i = 0; i < steps; i++){
+    const cents = C.slendro[i % C.slendro.length] + 1200 * Math.floor(i / C.slendro.length);
+    pitches.push(C.root * Math.pow(2, cents / 1200));
+  }
+
+  function paint(){
+    btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    btn.querySelector('.mute-t').textContent = muted ? 'Chime off' : 'Chime on';
+    btn.classList.toggle('off', muted);
+  }
+  paint();
+
+  /* a short, dark room: noise decaying exponentially, so the chime sits in a
+     space instead of arriving dry on top of the page */
+  function makeIR(secs){
+    const n = Math.floor(ctx.sampleRate * secs);
+    const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+    for(let c = 0; c < 2; c++){
+      const d = buf.getChannelData(c);
+      for(let i = 0; i < n; i++){
+        const t = i / n;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (1 - t * .2);
+      }
+    }
+    return buf;
+  }
+
+  function boot(){
+    if(ctx || !AC) return;
+    ctx = new AC();
+
+    bus = ctx.createGain(); bus.gain.value = 1;
+
+    const conv = ctx.createConvolver(); conv.buffer = makeIR(1.5);
+    const wet = ctx.createGain(); wet.gain.value = C.reverbMix;
+    const dry = ctx.createGain(); dry.gain.value = 1 - C.reverbMix;
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 14; comp.ratio.value = 3;
+    comp.attack.value = .006; comp.release.value = .25;
+
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : C.masterGain;
+
+    /* voices → reverb → compressor → master */
+    bus.connect(dry).connect(comp);
+    bus.connect(conv).connect(wet).connect(comp);
+    comp.connect(master).connect(ctx.destination);
+
+    /* one second of noise, reused by every strike */
+    const n = Math.floor(ctx.sampleRate * .25);
+    noise = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+
+  /* free the quietest voice when we are at the cap: whatever has decayed
+     furthest is the one nobody will miss */
+  function steal(now){
+    let worst = -1, worstLeft = Infinity;
+    for(let i = 0; i < voices.length; i++){
+      const v = voices[i];
+      const left = v.amp * Math.max(0, 1 - (now - v.at) / C.decays[0]);
+      if(left < worstLeft){ worstLeft = left; worst = i; }
+    }
+    if(worst < 0) return;
+    const v = voices[worst];
+    try{
+      v.g.gain.cancelScheduledValues(now);
+      v.g.gain.setValueAtTime(Math.max(1e-4, v.g.gain.value), now);
+      v.g.gain.exponentialRampToValueAtTime(1e-4, now + .06);
+      v.oscs.forEach(o => { try{ o.stop(now + .07); }catch(e){} });
+    }catch(e){}
+    voices.splice(worst, 1);
+  }
+
+  function strike(index, count, rate){
+    if(muted || !ctx || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+
+    const ms = now * 1000;
+    if(ms - (lastRing[index] || -1e6) < C.cooldown) return;
+    lastRing[index] = ms;
+
+    if(voices.length >= C.voices) steal(now);
+
+    /* how hard it was struck: velocity maps to loudness and to how bright the
+       strike transient is, the way hitting a bar harder excites more of it */
+    const amp = Math.max(.18, Math.min(1, (rate - C.threshold) / 1.5 + .3));
+    const freq = pitches[Math.min(pitches.length - 1, Math.floor(index / Math.max(1, count) * pitches.length))];
+
+    const g = ctx.createGain();
+    g.gain.value = 1;
+    g.connect(bus);
+
+    const src = ctx.createBufferSource(); src.buffer = noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = Math.min(12000, freq * (3.5 + amp * 5));
+    bp.Q.value = 1.1;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(.42 * amp, now);
+    ng.gain.exponentialRampToValueAtTime(1e-4, now + C.strike);
+    src.connect(bp).connect(ng).connect(g);
+    src.start(now); src.stop(now + C.strike + .02);
+
+    const oscs = [];
+    for(let i = 0; i < C.partials.length; i++){
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq * C.partials[i];
+      const og = ctx.createGain();
+      const peak = Math.max(1e-4, amp * .42 / (1 + i * 1.35));
+      og.gain.setValueAtTime(1e-4, now);
+      og.gain.exponentialRampToValueAtTime(peak, now + .004);
+      og.gain.exponentialRampToValueAtTime(1e-4, now + C.decays[i]);
+      o.connect(og).connect(g);
+      o.start(now); o.stop(now + C.decays[i] + .05);
+      oscs.push(o);
+    }
+
+    const v = { g, oscs, amp, at: now };
+    voices.push(v);
+    oscs[0].onended = ()=>{
+      const i = voices.indexOf(v);
+      if(i >= 0) voices.splice(i, 1);
+      try{ g.disconnect(); }catch(e){}
+    };
+  }
+
+  function setMuted(next){
+    muted = next;
+    store.muted = next;
+    paint();
+    if(!ctx) return;
+    if(muted){
+      try{ master.gain.setTargetAtTime(0, ctx.currentTime, .04); }catch(e){}
+      setTimeout(()=>{ if(muted && ctx && ctx.state === 'running') ctx.suspend(); }, 400);
+    } else {
+      if(ctx.state !== 'running') ctx.resume();
+      try{ master.gain.setTargetAtTime(C.masterGain, ctx.currentTime, .04); }catch(e){}
+    }
+  }
+
+  /* Never before a gesture: the context is not even constructed until the
+     visitor touches, clicks or types. */
+  function firstGesture(){
+    boot();
+    if(ctx && !muted && ctx.state !== 'running') ctx.resume();
+    ['pointerdown','keydown','touchstart'].forEach(t => removeEventListener(t, firstGesture, true));
+  }
+  ['pointerdown','keydown','touchstart'].forEach(t => addEventListener(t, firstGesture, true));
+
+  btn.addEventListener('click', ()=>{ boot(); setMuted(!muted); });
+
+  addEventListener('pagehide', ()=>{
+    voices = [];
+    if(ctx && ctx.state !== 'closed'){ try{ ctx.close(); }catch(e){} }
+  }, {once:true});
+
+  CHIME = { strike };
+})();
+
 const PLACES = [
   /* COFFEE */
   { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203],
@@ -1131,18 +1395,6 @@ const CATS = {
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C7.7 16.1 4.7 13 4.7 9.9 4.7 7.5 6.5 5.7 8.7 5.7c1.3 0 2.5.6 3.3 1.7.8-1.1 2-1.7 3.3-1.7 2.2 0 4 1.8 4 4.2 0 3.1-3 6.2-7.3 9.6Z"/></svg>` }
 };
 const ORDER = ["all","coffee","slowbar","food","friends"];
-
-/* guest identity + their recommendations, remembered on this device */
-const store = {
-  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
-  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
-  get name(){ return this.read('oy_name',''); },
-  set name(v){ this.write('oy_name', v); },
-  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
-  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
-  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
-  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
-};
 
 /* merged data: curated PLACES + this guest's own recommendations */
 let ALL = [];
