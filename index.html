@@ -60,6 +60,7 @@
   --roof-top:clamp(104px,13vh,150px);   /* floats clear of the nav */
   --eave:calc(var(--roof-top) + var(--roof-h));
   --curtain-w:calc(var(--roof-w) * .82);
+  --curtain-pad:110px;   /* slack canvas either side, so the cloth is never cut off by its own edge */
 
   /* Derived: how far the silhouette is thrown down the wall. A lower sun
      (smaller elevation) throws it further. */
@@ -69,6 +70,7 @@
 @media(max-width:760px){ :root{
   --roof-src:url("assets/joglo-roof-eave-820.png");
   --roof-w:min(86vw,420px); --roof-top:clamp(78px,10vh,110px); --curtain-w:calc(var(--roof-w) * .88);
+  --curtain-pad:48px;
 } }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
@@ -132,8 +134,13 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    the eaves overhang the strands the way they would over a real doorway. The
    cloth itself is drawn on this canvas; pointer-events stay off it so the shove
    is driven from window-level listeners and never blocks a click. */
+/* The canvas runs wider than the weave by --curtain-pad on each side. Sized to
+   the cloth exactly, the edge columns were drawn half outside it and anything
+   that swung outward was clipped, which put a hard invisible border down both
+   sides of the curtain. */
 .curtain{position:absolute; z-index:1; display:block;
-  left:calc(50% - var(--curtain-w) / 2); width:var(--curtain-w);
+  left:calc(50% - var(--curtain-w) / 2 - var(--curtain-pad));
+  width:calc(var(--curtain-w) + var(--curtain-pad) * 2);
   top:calc(var(--eave) - 38px);             /* tucked well up behind the fascia board */
   /* <canvas> is a replaced element: with height:auto it takes its intrinsic size
      and bottom:0 is simply dropped, so the height is stated outright. */
@@ -758,7 +765,7 @@ const CURTAIN_TUNE = {
   }
 
   let clusters = [];
-  let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0;
+  let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, pad = 0, clothW = 0;
   let atlas = null, boxPx = 0;
   let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0;
   let onScreen = true, visible = true, warm = false;
@@ -792,8 +799,10 @@ const CURTAIN_TUNE = {
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
 
+    pad = parseFloat(getComputedStyle(cv).getPropertyValue('--curtain-pad')) || 0;
+    clothW = Math.max(40, w - pad * 2);
     cols = matchMedia('(max-width:760px)').matches ? T.colsMobile : T.cols;
-    cellW = w / (cols - 1);
+    cellW = clothW / (cols - 1);
     rows = Math.max(6, Math.round(h / (cellW * .82)));
     cellH = h / (rows - 1);
     fontPx = Math.max(8, Math.round(cellH * T.glyph));
@@ -807,13 +816,13 @@ const CURTAIN_TUNE = {
       const solid = Math.round(rows * reach * (1 - T.tail));
       const endRow = Math.round(rows * reach);
       for(let j = 0; j < rows; j++){
-        const x = i * cellW, y = j * cellH;
+        const x = pad + i * cellW, y = j * cellH;
         /* the last stretch of every column thins out, so the curtain ends in
            loose threads instead of a ruled line across the opening */
         let a = ink;
         if(j >= endRow) a = 0;
         else if(j > solid){ const t = (j - solid) / Math.max(1, endRow - solid); a = ink * (1 - t * t * .94); }
-        P.push({ x, y, ox:x, oy:y, pinned: j === 0, a,
+        P.push({ x, y, ox:x, oy:y, pinned: j === 0, a, ph: i * .47,
                  ch: clusters[(i + j * cols) % clusters.length], down:null });
       }
     }
@@ -836,11 +845,16 @@ const CURTAIN_TUNE = {
 
   function simulate(time){
     const g = T.gravity, d = T.damping;
-    const b = T.breeze * (Math.sin(time * .31) * .6 + Math.sin(time * .17) * .3 + Math.sin(time * .073) * .28)
-            + tilt * T.breeze * 6;
+    const lean = tilt * T.breeze * 6;
     for(let k = 0; k < P.length; k++){
       const p = P[k];
       if(p.pinned) continue;
+      /* Each column gets its own phase. Sharing one meant every particle was
+         pushed the same way at the same moment, so the whole sheet slid
+         sideways as a block instead of rippling — and drifted off centre. */
+      const b = T.breeze * ( Math.sin(time * .31 + p.ph) * .6
+                           + Math.sin(time * .17 + p.ph * 1.7) * .3
+                           + Math.sin(time * .073 + p.ph * 2.6) * .28 ) + lean;
       const vx = (p.x - p.ox) * d, vy = (p.y - p.oy) * d;
       p.ox = p.x; p.oy = p.y;
       p.x += vx + b;
@@ -942,7 +956,7 @@ const CURTAIN_TUNE = {
       p.x += dx * s; p.y += dy * s;
     }
     wake();
-    if(CHIME) CHIME.gesture(x, r.width);
+    if(CHIME) CHIME.gesture(Math.min(1, Math.max(0, (x - pad) / clothW)));
   }
 
   addEventListener('pointermove', e=>{
@@ -1071,6 +1085,7 @@ const CHIME_TUNE = {
     ? matchMedia('(prefers-reduced-motion: reduce)').matches
     : store.muted;
   let lastMove = 0, lastX = 0, travel = 0;   /* gesture tracking */
+  const spanPx = 600;                        /* converts the 0..1 position back to travel in px */
 
   /* one frequency per scale degree, climbing left to right across the opening */
   const steps = C.slendro.length * C.octaves;
@@ -1153,17 +1168,17 @@ const CHIME_TUNE = {
 
   /* Called on every pointer move. Decides whether this movement has earned a
      note; the synthesis below only runs when it has. */
-  function gesture(x, width){
+  function gesture(pos){
     if(muted || !ctx || ctx.state !== 'running') return;
     const t = performance.now();
     let fire = false;
     if(t - lastMove > C.restMs){ travel = 0; fire = true; }   /* a new gesture */
     else {
-      travel += Math.abs(x - lastX);
+      travel += Math.abs(pos - lastX) * spanPx;
       if(travel >= C.stride){ travel = 0; fire = true; }      /* still sweeping */
     }
-    lastMove = t; lastX = x;
-    if(fire) strike(x / Math.max(1, width));
+    lastMove = t; lastX = pos;
+    if(fire) strike(pos);
   }
   function rest(){ lastMove = 0; travel = 0; }
 
