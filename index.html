@@ -135,12 +135,18 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .curtain{position:absolute; z-index:1;
   left:calc(50% - var(--curtain-w) / 2); width:var(--curtain-w);
   top:calc(var(--eave) - 14px); bottom:0}   /* tucked up behind the fascia board */
-.strand{position:absolute; top:var(--dy); left:var(--x); transform-origin:50% 0;
-  transform:translateX(-50%);
-  display:flex; flex-direction:column; align-items:center;
+/* A strand is a chain of nested .seg boxes: each one holds a few clusters and
+   then the segment below it, and pivots from its own top edge. Nesting is what
+   makes the rotations compound down the chain, so a strand bends along its
+   length instead of swinging as a rigid bar. .strand itself only positions —
+   the physics writes to the segments. */
+.strand{position:absolute; top:var(--dy); left:var(--x); transform:translateX(-50%);
   font-family:var(--javanese); font-weight:400; color:var(--ink);
   font-size:var(--fs); line-height:var(--lh); opacity:var(--op);
-  white-space:nowrap; pointer-events:none; -webkit-user-select:none; user-select:none}
+  text-align:center; white-space:nowrap;
+  pointer-events:none; -webkit-user-select:none; user-select:none}
+.seg{display:block; transform-origin:50% 0}
+.curtain.live .seg{will-change:transform}
 .strand i{display:block; font-style:normal; opacity:var(--g,1)}
 
 /* 2 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
@@ -654,13 +660,38 @@ const CURTAIN_TUNE = {
   ink:[.52,1],           /* per-strand opacity */
   drop:[0,10],           /* how far below the eave a strand starts, px */
   jitter:.34,            /* sideways wander off the even spacing, in strand-widths */
-  tail:.34               /* fraction of each strand that thins out toward its end */
+  tail:.34,              /* fraction of each strand that thins out toward its end */
+
+  /* ---- the physics ----
+     Each strand is a verlet string pinned at the eave: a chain of nodes carrying
+     position and an implied velocity, integrated then pulled back onto their
+     segment lengths. There is no explicit restoring torque — gravity plus the
+     length constraints ARE the restoring force, which is why a strand keeps
+     swinging past vertical and settles the way a hanging cord does. It also
+     bends along its length rather than pivoting rigidly, so a disturbance runs
+     down a strand as well as sideways through its neighbours. */
+  joints:5,              /* articulated segments per strand */
+  jointsMobile:3,
+  gravity:2200,          /* px/s² — sets how languid the swing is: ω ≈ √(g/length) */
+  friction:.945,         /* velocity retained per step — the damping term; sets how long a disturbance rings */
+  relax:3,               /* constraint relaxation passes per step */
+  coupling:.17,          /* neighbour coupling: 0 = strands act alone, 1 = they move as one */
+  breeze:90,             /* ambient breeze acceleration, px/s² */
+  impulse:.17,           /* how hard the pointer grabs: fraction of the way to the hand's own speed, per step */
+  maxSweep:60,           /* px of pointer travel per step that can count — guards against teleporting cursors */
+  radius:.3,             /* pointer reach, as a fraction of the curtain width */
+  lift:.3,               /* how much light the most-displaced strands catch */
+  hz:60                  /* fixed simulation rate; render still runs per frame */
 };
 
 (function curtain(){
   const hero = document.querySelector('.hero');
   const host = document.getElementById('curtain');
   if(!hero || !host) return;
+
+  const T = CURTAIN_TUNE;
+  const RAD = 180 / Math.PI;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* A fixed seed, so the hang is identical on every load and every resize —
      the curtain should feel like an object, not a shuffle. */
@@ -681,53 +712,278 @@ const CURTAIN_TUNE = {
   }
 
   let clusters = [];
+  let strands = [];        /* the simulation */
+  let raf = 0, acc = 0, last = 0, t0 = 0;
+  let onScreen = true, visible = true, warm = false;
+  /* Pointer travel is accumulated here and spent inside the fixed step. Applying
+     it per event instead would let a high-rate mouse inject many times the
+     impulse of a slow one for the same physical sweep. */
+  const ptr = { x:0, y:0, dx:0, have:false };
 
   function build(){
     if(!clusters.length) return;
     const w = host.clientWidth, h = host.clientHeight;
     if(!w || !h) return;
 
-    const n = matchMedia('(max-width:760px)').matches ? CURTAIN_TUNE.strandsMobile : CURTAIN_TUNE.strands;
+    const small = matchMedia('(max-width:760px)').matches;
+    const n = small ? T.strandsMobile : T.strands;
+    const joints = small ? T.jointsMobile : T.joints;
     const rand = rng(0x5EED1A);
-    const step = 100 / n;
+    const step = w / n;
     const frag = document.createDocumentFragment();
+    const built = [];
     let ci = 0;
 
     for(let i = 0; i < n; i++){
       const el = document.createElement('div');
       el.className = 'strand';
-      const fs = Math.round(lerp(CURTAIN_TUNE.glyph[0], CURTAIN_TUNE.glyph[1], rand()));
-      const lh = lerp(CURTAIN_TUNE.lead[0], CURTAIN_TUNE.lead[1], rand());
-      const dy = Math.round(lerp(CURTAIN_TUNE.drop[0], CURTAIN_TUNE.drop[1], rand()));
-      const reach = lerp(CURTAIN_TUNE.reach[0], CURTAIN_TUNE.reach[1], rand());
-      const count = Math.max(3, Math.round((h - dy) * reach / (fs * lh)));
-      const x = step * (i + .5) + (rand() - .5) * step * CURTAIN_TUNE.jitter;
+      const fs = Math.round(lerp(T.glyph[0], T.glyph[1], rand()));
+      const lh = lerp(T.lead[0], T.lead[1], rand());
+      const dy = Math.round(lerp(T.drop[0], T.drop[1], rand()));
+      const reach = lerp(T.reach[0], T.reach[1], rand());
+      const count = Math.max(joints, Math.round((h - dy) * reach / (fs * lh)));
+      const x = step * (i + .5) + (rand() - .5) * step * T.jitter;
+      const op = lerp(T.ink[0], T.ink[1], rand());
 
-      el.style.setProperty('--x', x.toFixed(3) + '%');
+      el.style.setProperty('--x', x.toFixed(2) + 'px');
       el.style.setProperty('--fs', fs + 'px');
       el.style.setProperty('--lh', lh.toFixed(3));
       el.style.setProperty('--dy', dy + 'px');
-      el.style.setProperty('--op', lerp(CURTAIN_TUNE.ink[0], CURTAIN_TUNE.ink[1], rand()).toFixed(3));
+      el.style.setProperty('--op', op.toFixed(3));
 
-      /* The last stretch of every strand thins out, so the curtain ends in
-         loose trailing threads instead of a ruled line across the opening.
-         Baked in at build time — nothing here costs anything per frame. */
-      const solid = Math.round(count * (1 - CURTAIN_TUNE.tail));
-      let html = '';
-      for(let g = 0; g < count; g++){
-        const c = clusters[ci++ % clusters.length];
-        if(g < solid) html += '<i>' + c + '</i>';
-        else {
-          const t = (g - solid) / Math.max(1, count - solid);
-          html += '<i style="--g:' + (1 - t * t * .94).toFixed(2) + '">' + c + '</i>';
+      /* Split the strand's clusters across its joints, nesting each segment
+         inside the one above so a rotation compounds down the chain the way a
+         real cord bends. The last stretch thins out, so the curtain ends in
+         loose threads instead of a ruled line across the opening — baked in
+         here, at build time, so it costs nothing per frame. */
+      const per = Math.ceil(count / joints);
+      const solid = Math.round(count * (1 - T.tail));
+      const segs = [], lens = [];
+      let parent = el, g = 0;
+      for(let j = 0; j < joints; j++){
+        const seg = document.createElement('span');
+        seg.className = 'seg';
+        const take = (j === joints - 1) ? (count - g) : Math.min(per, count - g);
+        let html = '';
+        for(let k = 0; k < take; k++, g++){
+          const c = clusters[ci++ % clusters.length];
+          if(g < solid) html += '<i>' + c + '</i>';
+          else {
+            const f = (g - solid) / Math.max(1, count - solid);
+            html += '<i style="--g:' + (1 - f * f * .94).toFixed(2) + '">' + c + '</i>';
+          }
         }
+        seg.innerHTML = html;
+        parent.appendChild(seg);
+        parent = seg;
+        segs.push(seg);
+        lens.push(Math.max(1, take * fs * lh));
       }
-      el.innerHTML = html;
+
       frag.appendChild(el);
+      built.push({ el, segs, lens, x, dy, op, joints,
+                   phase: rand() * Math.PI * 2,
+                   nodes:null, lastLift:-1 });
     }
+
     host.textContent = '';
     host.appendChild(frag);
+
+    /* seed the simulation: every string hanging straight down from its anchor */
+    for(const s of built){
+      const nodes = [];
+      let y = 0;
+      nodes.push({ x:s.x, y:0, px:s.x, py:0 });
+      for(let j = 0; j < s.joints; j++){
+        y += s.lens[j];
+        nodes.push({ x:s.x, y, px:s.x, py:y });
+      }
+      s.nodes = nodes;
+      s.v = new Float64Array(nodes.length);   /* velocity scratch, reused every step */
+    }
+    strands = built;
+    render();
   }
+
+  /* ---- one fixed simulation step ---- */
+  function simulate(dt, time){
+    const g = T.gravity * dt * dt;
+    const brz = T.breeze * dt * dt;
+    if(ptr.dx) applySweep();
+
+    /* Snapshot horizontal velocities before anything moves, so coupling reads a
+       consistent picture of the whole curtain rather than a half-updated one. */
+    for(const s of strands){
+      const nodes = s.nodes, v = s.v;
+      for(let k = 1; k < nodes.length; k++) v[k] = nodes[k].x - nodes[k].px;
+    }
+
+    for(let i = 0; i < strands.length; i++){
+      const s = strands[i];
+      const nodes = s.nodes;
+      const L = nodes.length - 1;
+      const ph = s.phase;
+
+      /* Ambient breeze: three slow incommensurate sines with a per-strand phase,
+         so the curtain is never quite at rest and never in step with itself. */
+      const b = brz * ( Math.sin(time * .31 + ph) * .6
+                      + Math.sin(time * .17 + ph * 1.7) * .3
+                      + Math.sin(time * .073 + ph * 2.6) * .28 );
+
+      /* Neighbour coupling blends VELOCITY, not position. Pulling positions
+         together fights the length constraints — each step the constraint pass
+         yanks the node back and, because verlet carries velocity implicitly in
+         the previous position, that yank reads as speed. The chain gains energy
+         until it flips over its own anchor. Sharing momentum instead can only
+         ever move energy sideways between strands, never create it, and it is
+         what actually carries a disturbance across the curtain. */
+      const left = i > 0 ? strands[i-1] : null;
+      const right = i < strands.length - 1 ? strands[i+1] : null;
+
+      for(let k = 1; k <= L; k++){
+        const nd = nodes[k];
+        const depth = k / L;
+
+        let shared = 0, n = 0;
+        if(left && left.v.length > k){ shared += left.v[k]; n++; }
+        if(right && right.v.length > k){ shared += right.v[k]; n++; }
+        if(n) nd.px -= (shared / n - s.v[k]) * T.coupling;
+
+        const vx = (nd.x - nd.px) * T.friction;
+        const vy = (nd.y - nd.py) * T.friction;
+        nd.px = nd.x; nd.py = nd.y;
+        nd.x += vx + b * depth;
+        nd.y += vy + g;
+      }
+
+      /* pull the chain back onto its segment lengths; the anchor never moves */
+      for(let pass = 0; pass < T.relax; pass++){
+        nodes[0].x = s.x; nodes[0].y = 0;
+        for(let k = 1; k <= L; k++){
+          const a = nodes[k-1], c = nodes[k];
+          let dx = c.x - a.x, dy = c.y - a.y;
+          const d = Math.hypot(dx, dy) || 1e-4;
+          const diff = (d - s.lens[k-1]) / d;
+          c.x -= dx * diff; c.y -= dy * diff;
+        }
+      }
+    }
+  }
+
+  /* ---- write transforms; no layout is read in here ---- */
+  function render(){
+    for(let i = 0; i < strands.length; i++){
+      const s = strands[i];
+      const nodes = s.nodes;
+      let prev = 0;
+      for(let k = 0; k < s.joints; k++){
+        const a = nodes[k], c = nodes[k+1];
+        /* screen y grows downward, so a segment leaning right needs a negative
+           CSS rotation to swing its foot that way */
+        const ang = Math.atan2(-(c.x - a.x), c.y - a.y);
+        s.segs[k].style.transform = 'rotate(' + ((ang - prev) * RAD).toFixed(2) + 'deg)';
+        prev = ang;
+      }
+      /* light catches the strands that have turned furthest out of the plane */
+      const off = Math.min(1, Math.abs(nodes[nodes.length-1].x - s.x) / 90);
+      const lift = Math.round(off * 100);
+      if(lift !== s.lastLift){
+        s.lastLift = lift;
+        s.el.style.setProperty('--op', (s.op * (1 - T.lift * off)).toFixed(3));
+      }
+    }
+  }
+
+  function frame(now){
+    raf = 0;
+    if(!visible || !strands.length) return;
+    const dt = 1 / T.hz;
+    acc += Math.min(.25, (now - last) / 1000);
+    last = now;
+    const time = (now - t0) / 1000;
+    let steps = 0;
+    while(acc >= dt && steps < 4){ simulate(dt, time); acc -= dt; steps++; }
+    if(steps) render();
+    raf = requestAnimationFrame(frame);
+  }
+
+  function wake(){
+    if(still || raf || !visible || !strands.length) return;
+    last = performance.now();
+    if(!t0) t0 = last;
+    acc = 0;
+    if(!warm){ warm = true; host.classList.add('live'); }
+    raf = requestAnimationFrame(frame);
+  }
+  function sleep(){
+    if(raf){ cancelAnimationFrame(raf); raf = 0; }
+    if(warm){ warm = false; host.classList.remove('live'); }
+  }
+
+  /* ---- pointer drives velocity, not position ---- */
+  function applySweep(){
+    let dx = ptr.dx, x = ptr.x, y = ptr.y, h = ptr.h;
+    ptr.dx = 0;
+    if(dx > T.maxSweep) dx = T.maxSweep; else if(dx < -T.maxSweep) dx = -T.maxSweep;
+    const R = ptr.w * T.radius;
+    for(const s of strands){
+      const d = Math.abs(s.x - x);
+      if(d > R) continue;
+      const f = 1 - d / R;
+      const fall = f * f;                          /* smooth falloff */
+      const nodes = s.nodes, L = nodes.length - 1;
+      for(let k = 1; k <= L; k++){
+        /* nodes nearer the pointer's height, and lower down the strand, take
+           more of the impulse — the curtain parts where your hand passes.
+           Each one is EASED TOWARD the hand's speed rather than shoved by a
+           fixed amount: shoving adds displacement every step the pointer stays
+           in range, so a slow hover would wind a strand up past the speed of
+           the hand that is moving it. Blending tops out at the hand's own
+           speed, which is what makes a fast sweep part the curtain and a slow
+           drift barely stir it. */
+        const nd = nodes[k];
+        const vgap = Math.abs(nd.y - y) / Math.max(1, h);
+        const reach = Math.max(.15, 1 - vgap);
+        nd.px -= (dx - (nd.x - nd.px)) * T.impulse * fall * reach * (k / L);
+      }
+    }
+  }
+
+  function track(clientX, clientY){
+    if(still || !strands.length) return;
+    const box = host.getBoundingClientRect();      /* read here, never inside frame() */
+    const x = clientX - box.left, y = clientY - box.top;
+    ptr.w = box.width; ptr.h = box.height; ptr.y = y;
+    if(ptr.have) ptr.dx += x - ptr.x;
+    ptr.x = x; ptr.have = true;
+    wake();
+  }
+
+  addEventListener('pointermove', e=>{
+    if(e.pointerType === 'touch') return;          /* touch handled below, without scroll capture */
+    if(e.clientY > hero.getBoundingClientRect().bottom){ ptr.have = false; return; }
+    track(e.clientX, e.clientY);
+  }, {passive:true});
+
+  hero.addEventListener('touchmove', e=>{
+    const t = e.touches[0]; if(!t) return;
+    track(t.clientX, t.clientY);
+  }, {passive:true});
+  hero.addEventListener('touchend', ()=>{ ptr.have = false; }, {passive:true});
+
+  /* ---- run only while the hero is actually on screen ---- */
+  document.addEventListener('visibilitychange', ()=>{
+    visible = onScreen && !document.hidden;
+    visible ? wake() : sleep();
+  });
+  const io = new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      onScreen = e.isIntersecting;
+      visible = onScreen && !document.hidden;
+      visible ? wake() : sleep();
+    });
+  }, {threshold:0});
+  io.observe(hero);
 
   /* Rebuild on resize only when the box actually changed — mobile browsers fire
      resize as the URL bar slides away, and rehanging the curtain for that would
@@ -738,11 +994,13 @@ const CURTAIN_TUNE = {
     rt = setTimeout(()=>{
       const w = host.clientWidth, h = host.clientHeight;
       if(Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 40) return;
-      lastW = w; lastH = h; build();
+      lastW = w; lastH = h; build(); wake();
     }, 180);
   }
   addEventListener('resize', onResize, {passive:true});
   addEventListener('orientationchange', onResize, {passive:true});
+
+  addEventListener('pagehide', ()=>{ sleep(); io.disconnect(); }, {once:true});
 
   fetch('assets/javanese-script.txt')
     .then(r => r.ok ? r.text() : Promise.reject(r.status))
@@ -754,6 +1012,7 @@ const CURTAIN_TUNE = {
       clusters = toClusters(body).filter(c => c.trim());
       lastW = host.clientWidth; lastH = host.clientHeight;
       build();
+      wake();
     })
     .catch(()=>{ /* no corpus: the roof, wall and shadow still compose on their own */ });
 })();
