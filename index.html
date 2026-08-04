@@ -67,6 +67,19 @@
   --curtain-end:90%;     /* how far down the hero the cloth hangs. It ends on its own hem
                             rather than being sliced off by the bottom of the section */
 
+  /* The column of type that fits to the LEFT of the doorway, used as a hard cap on
+     the hero copy so the weave is never read through — the script has to hang whole,
+     and the keep-out that protects the copy (see `keep` in the script) is measured
+     off these boxes, so every pixel the copy claims is a pixel cut out of the cloth.
+     .wrap is centred, so the copy's own left edge and the viewport share a centre:
+     the cloth's left edge is 50% - --curtain-w / 2 measured from there. Stated as a
+     percentage rather than in vw on purpose — vw counts the scrollbar and the canvas
+     does not, which would drift the two apart by the scrollbar's width.
+     The subtracted term is the air between the last letter and the first strand; it
+     also has to cover the half glyph-box the outermost column of script is stamped
+     with, which reaches ~12px further left than the weave's nominal edge. */
+  --hero-col:calc(50% - var(--curtain-w) / 2 - clamp(28px, 3vw, 52px));
+
   /* Derived: how far the silhouette is thrown down the wall. A lower sun
      (smaller elevation) throws it further. */
   --shadow-len:calc(.86 / var(--sun-elevation));
@@ -233,12 +246,22 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    the text (see the mobile block below). */
 .hero-veil{position:absolute; left:0; right:0; bottom:0; height:46%; z-index:4; pointer-events:none}
 .hero-content{position:relative; z-index:5; color:var(--ink); padding-bottom:clamp(48px,9vh,110px); width:100%}
-.hero-content > *{max-width:min(52%, 620px)}
+.hero-content > *{max-width:var(--hero-col)}
 .hero-content .eyebrow{display:block}   /* it is a <span>, and inline boxes ignore max-width */
 .hero-content .eyebrow{color:var(--muted); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
-.hero-title{margin-top:clamp(18px,2.4vh,30px); font-size:clamp(46px,6.6vw,100px); font-weight:300; letter-spacing:-.015em; line-height:1.02; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
+/* "Our Yogyakarta" sets on one line at 6.11em wide, so the size is what decides
+   whether it stays in its column or runs across the doorway. --hero-col caps the
+   box either way, but the cap alone would only fold the title onto a second line —
+   the size has to come down with the column or the headline wraps instead of fits.
+   The column grows by ~0.29px per px of viewport while the type it has to hold is
+   flat-rate, which no plain vw can track; the -15px offset is what bends the ramp
+   to match. Measured 901px–1920px, that leaves the headline 26–66px clear of the
+   first strand and never folds it onto a second line. */
+.hero-title{margin-top:clamp(18px,2.4vh,30px); font-size:clamp(31px, calc(4.6vw - 15px), 46px); font-weight:300; letter-spacing:-.015em; line-height:1.02; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
 .hero-title em{font-style:italic}
-.hero-lede{margin-top:clamp(20px,2.6vh,34px); max-width:min(42%,460px); color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:15px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
+/* no max-width of its own: it takes --hero-col from .hero-content > * like the rest
+   of the copy, so the whole block stops on one line down the left of the doorway */
+.hero-lede{margin-top:clamp(20px,2.6vh,34px); color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:15px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
 .hero-link{color:var(--ink)}
 /* One row on the page's own margins: the CTA is the single primary action on the
    left, the audio toggle and scroll cue a quieter pair on the right, all sharing
@@ -281,6 +304,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
      weave. */
   :root{ --curtain-end:54% }
   .hero-content > *{max-width:none}
+  /* Full width and the cloth stopped short of it, so there is nothing to clear and
+     the headline goes back to hero scale — the size above is a consequence of the
+     column beside the doorway, not of the type wanting to be small. */
+  .hero-title{font-size:clamp(46px,6.6vw,100px)}
   .hero-lede{max-width:38ch}
   .hero-veil{height:52%;
     background:linear-gradient(180deg, rgba(247,243,235,0) 0%, rgba(247,243,235,.6) 42%, rgba(247,243,235,.9) 74%, rgba(247,243,235,.96) 100%)}
