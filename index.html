@@ -36,10 +36,10 @@
   --ink:#2B2924; --ink-2:#413D36; --muted:#5E594F; --line:#DAD4C7; --line-2:#BFB8A8;
   --serif:"Cormorant Garamond", Georgia, serif; --sans:"Jost", system-ui, sans-serif;
   --javanese:"Noto Sans Javanese", var(--serif);
-  /* The falling script is background texture, not text to be read: its own warm
-     taupe rather than the foreground --ink, so it recedes instead of competing
-     with the headline at nearly the same contrast. */
-  --script-ink:#5E5546;
+  /* The falling script has its own colour token so it can be tuned without
+     touching the foreground --ink. Near-black rather than pure #000: a hair of
+     warmth keeps it in the cream/terracotta palette instead of reading cold. */
+  --script-ink:#1B1712;
   --maxw:1320px; --gutter:64px; --section-gap:150px;
 
   /* ===== HERO TUNING — the doorway =====
@@ -763,7 +763,9 @@ const CURTAIN_TUNE = {
   cols:32,               /* glyph columns across the doorway */
   colsMobile:20,
   glyph:.9,              /* font size as a multiple of the row spacing */
-  ink:.24,               /* one opacity for every glyph — present as texture, not copy */
+  ink:1,                 /* one opacity for every glyph — solid, not ghosted */
+  keepFeather:150,       /* px over which the script fades out around the copy — wide
+                            enough that it thins toward the type rather than cutting an arc */
 
   /* ---- the cloth, exactly as the pen has it ---- */
   gravity:.2,
@@ -808,7 +810,7 @@ const CURTAIN_TUNE = {
   let clusters = [];
   let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, clothW = 0;
   let originX = 0, originY = 0, clothBottom = 0;   /* where the weave sits inside the canvas */
-  let atlas = null, boxPx = 0, fade = null;
+  let atlas = null, boxPx = 0, fade = null, keep = null;
   const FADE_N = 96;                     /* resolution of the vertical fade ramp */
   let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0, calm = 0;
   let onScreen = true, visible = true;
@@ -878,10 +880,27 @@ const CURTAIN_TUNE = {
     fade = new Float32Array(FADE_N);
     for(let i = 0; i < FADE_N; i++){
       const u = i / (FADE_N - 1);
-      fade[i] = T.ink * (u < .44 ? 1
-                       : u < .62 ? 1 - (u - .44) / .18 * .62
-                       : u < .78 ? .38 - (u - .62) / .16 * .32
-                       : Math.max(0, .06 - (u - .78) / .22 * .06));
+      /* only the tail of the throw fades now — the copy is protected by the
+         keep-out region below rather than by flattening the whole layer */
+      fade[i] = T.ink * (u < .72 ? 1 : Math.max(0, 1 - (u - .72) / .28));
+    }
+
+    /* The keep-out is the box the reading copy occupies, not a band across the
+       frame. A vertical ramp cannot both let the script go dark and clear the
+       headline, because on wide screens the headline sits in the MIDDLE of the
+       weave's vertical span — it only misses it horizontally. Measured off the
+       live elements so it follows the type at any width. */
+    keep = null;
+    const parts = ['.hero-content .eyebrow', '.hero-title', '.hero-lede'];
+    for(const sel of parts){
+      const el = document.querySelector(sel);
+      if(!el) continue;
+      const r = el.getBoundingClientRect();
+      if(!r.width || !r.height) continue;
+      const x0 = r.left - cr.left, y0 = r.top - cr.top, x1 = r.right - cr.left, y1 = r.bottom - cr.top;
+      keep = keep ? { x0:Math.min(keep.x0,x0), y0:Math.min(keep.y0,y0),
+                      x1:Math.max(keep.x1,x1), y1:Math.max(keep.y1,y1) }
+                  : { x0, y0, x1, y1 };
     }
 
     P = []; links = [];
@@ -962,7 +981,14 @@ const CURTAIN_TUNE = {
       if(!img) continue;
       let i = ((p.y - originY) * fs) | 0;
       if(i < 0) i = 0; else if(i >= FADE_N) i = FADE_N - 1;
-      const a = fade[i];
+      let a = fade[i];
+      if(keep){
+        /* distance outside the copy's box, smoothed — 0 inside it, full well clear of it */
+        const dx = Math.max(keep.x0 - p.x, 0, p.x - keep.x1);
+        const dy = Math.max(keep.y0 - p.y, 0, p.y - keep.y1);
+        const d = Math.min(1, Math.sqrt(dx * dx + dy * dy) / T.keepFeather);
+        a *= d * d * (3 - 2 * d);
+      }
       if(a < .004) continue;
       if(a !== alpha){ ctx.globalAlpha = alpha = a; }
       let cos = 1, sin = 0;
