@@ -302,8 +302,17 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   /* On a narrow screen the type sits under the doorway rather than beside it, so
      the cloth has to stop short of it — otherwise the words are read through the
      weave. */
-  :root{ --curtain-end:54% }
+  :root{ --curtain-end:64% }
   .hero-content > *{max-width:none}
+  /* The copy is bottom-anchored, so it cannot simply be pushed down — the only way
+     it starts lower is by taking up less room. Every pixel it gives back is a pixel
+     of strand that the keep-out no longer has to erase, so the spacing tightens here
+     and the strands get the difference. Deliberately not applied above 900px, where
+     the type sits beside the doorway and is not competing with the cloth at all. */
+  .hero-content{padding-bottom:clamp(32px,5.2vh,64px)}
+  .hero-title{margin-top:clamp(12px,1.5vh,20px)}
+  .hero-lede{margin-top:clamp(13px,1.7vh,22px); line-height:1.62}
+  .hero-foot{margin-top:clamp(20px,2.8vh,34px)}
   /* Full width and the cloth stopped short of it, so there is nothing to clear and
      the headline goes back to hero scale — the size above is a consequence of the
      column beside the doorway, not of the type wanting to be small. */
@@ -825,11 +834,18 @@ let CHIME = null;
 const CURTAIN_TUNE = {
   /* ---- the grid ---- */
   cols:32,               /* glyph columns across the doorway */
-  colsMobile:20,
+  colsMobile:18,
   glyph:.9,              /* font size as a multiple of the row spacing */
   ink:1,                 /* one opacity for every glyph — solid, not ghosted */
   keepFeather:150,       /* px over which the script fades out around the copy — wide
                             enough that it thins toward the type rather than cutting an arc */
+  keepFeatherNarrow:88,  /* Below 900px the copy sits UNDER the doorway instead of beside
+                            it, so the feather is subtracted from the cloth's own height
+                            rather than from clear wall to its side. At 150 it reached
+                            within 47px of the eave on a 390px phone — the whole hem was
+                            inside the ramp, which is what made the strands look sliced
+                            off rather than hung. Narrower here so the fade reads as a
+                            hem just above the type; the veil wash does the rest. */
 
   /* ---- the cloth, exactly as the pen has it ---- */
   gravity:.2,
@@ -874,7 +890,7 @@ const CURTAIN_TUNE = {
   let clusters = [];
   let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, clothW = 0;
   let originX = 0, originY = 0, clothBottom = 0;   /* where the weave sits inside the canvas */
-  let atlas = null, boxPx = 0, fade = null, keep = null;
+  let atlas = null, boxPx = 0, fade = null, keep = null, keepFeather = 0;
   const FADE_N = 96;                     /* resolution of the vertical fade ramp */
   let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0, calm = 0;
   let onScreen = true, visible = true;
@@ -920,6 +936,9 @@ const CURTAIN_TUNE = {
     originX = (w - clothW) / 2;
 
     cols = matchMedia('(max-width:760px)').matches ? T.colsMobile : T.cols;
+    /* 900px, not 760px: this tracks the layout breakpoint where the copy moves under
+       the doorway, which is what changes what the feather is eating into. */
+    keepFeather = matchMedia('(max-width:900px)').matches ? T.keepFeatherNarrow : T.keepFeather;
     cellW = clothW / (cols - 1);
     rows = Math.max(6, Math.round(clothH / cellW) + 1);
     cellH = clothH / (rows - 1);
@@ -1050,7 +1069,7 @@ const CURTAIN_TUNE = {
         /* distance outside the copy's box, smoothed — 0 inside it, full well clear of it */
         const dx = Math.max(keep.x0 - p.x, 0, p.x - keep.x1);
         const dy = Math.max(keep.y0 - p.y, 0, p.y - keep.y1);
-        const d = Math.min(1, Math.sqrt(dx * dx + dy * dy) / T.keepFeather);
+        const d = Math.min(1, Math.sqrt(dx * dx + dy * dy) / keepFeather);
         a *= d * d * (3 - 2 * d);
       }
       if(a < .004) continue;
