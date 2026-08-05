@@ -627,6 +627,31 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .rec-error{display:none; margin-top:7px; font-size:12.5px; color:#8C3B2E}
 .rec-field.invalid .rec-error{display:block}
 .rec-field.invalid input,.rec-field.invalid textarea{border-color:#8C3B2E}
+.rec-opt{font-size:10px; letter-spacing:.14em; color:var(--line-2); margin-left:8px}
+
+/* the place field is a combobox: type, and OpenStreetMap answers with real pins */
+.rec-combo{position:relative}
+.rec-suggest{position:absolute; z-index:40; top:calc(100% - 1px); left:0; right:0; margin:0; padding:0; list-style:none;
+  background:var(--white); border:1px solid var(--ink); max-height:264px; overflow-y:auto; box-shadow:0 18px 40px rgba(40,36,30,.16)}
+.rec-suggest li{padding:11px 16px; cursor:pointer; border-top:1px solid var(--line)}
+.rec-suggest li:first-child{border-top:none}
+.rec-suggest li[aria-selected="true"],.rec-suggest li:hover{background:var(--surface-2)}
+.rec-suggest b{display:block; font-family:var(--sans); font-weight:400; font-size:14.5px; color:var(--ink)}
+.rec-suggest small{display:block; margin-top:2px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
+.rec-suggest .rec-searching{color:var(--muted); font-family:var(--sans); font-weight:300; font-size:13px; cursor:default}
+.rec-suggest .rec-searching:hover{background:none}
+
+/* where the pin currently stands, and the way out when OSM has never heard of the place */
+.rec-pin{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-top:9px}
+.rec-pin-state{font-family:var(--sans); font-weight:300; font-size:12.5px; line-height:1.6; color:var(--muted); margin:0}
+.rec-pin-state.set{color:var(--ink-2)}
+.rec-pin-state.set b{font-weight:400}
+.rec-pin-toggle{font-family:var(--sans); font-size:12.5px; font-weight:300; color:var(--ink); background:none; border:none;
+  padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line-2)}
+.rec-pin-toggle:hover{text-decoration-color:var(--ink)}
+.rec-mini{margin-top:12px}
+.rec-mini-map{height:230px; border:1px solid var(--line-2); background:var(--surface-2)}
+.rec-mini-hint{margin-top:8px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
 .rec-submit{display:inline-flex; align-items:center; min-height:48px; padding:14px 30px; cursor:pointer;
   font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
   background:var(--ink); color:var(--surface); border:1px solid var(--ink); transition:background .3s}
@@ -788,13 +813,31 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
         </div>
         <div class="rec-field" id="f-place">
           <label for="rec-place">The place</label>
-          <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…" />
+          <div class="rec-combo">
+            <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…"
+                   role="combobox" aria-expanded="false" aria-controls="rec-suggest"
+                   aria-autocomplete="list" aria-describedby="rec-pin-state" autocomplete="off" />
+            <ul class="rec-suggest" id="rec-suggest" role="listbox" aria-label="Matching places" hidden></ul>
+          </div>
           <p class="rec-error">What's the place called?</p>
+          <div class="rec-pin">
+            <p class="rec-pin-state" id="rec-pin-state">Type a few letters and pick it from the list, so it lands on the right corner.</p>
+            <button type="button" class="rec-pin-toggle" id="rec-pin-toggle" aria-expanded="false" aria-controls="rec-mini">Place the pin myself</button>
+          </div>
+          <div class="rec-mini" id="rec-mini" hidden>
+            <div class="rec-mini-map" id="rec-mini-map"></div>
+            <p class="rec-mini-hint">Tap anywhere to move the pin — or drag it. Zoom in to be exact.</p>
+          </div>
         </div>
         <div class="rec-field" id="f-why">
           <label for="rec-why">Why do we need to try it?</label>
           <textarea id="rec-why" name="why" rows="4" placeholder="What should we order? What makes it special?"></textarea>
           <p class="rec-error">Give us a line on why it's worth the trip.</p>
+        </div>
+        <div class="rec-field" id="f-link">
+          <label for="rec-link">Google Maps link <span class="rec-opt">OPTIONAL</span></label>
+          <input id="rec-link" name="link" type="url" inputmode="url" autocomplete="off"
+                 placeholder="Paste one and the directions button goes straight there" />
         </div>
         <button type="submit" class="rec-submit">Add your recommendation</button>
         <p class="rec-status" id="rec-status" aria-live="polite"></p>
@@ -845,6 +888,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    --sun-elevation in :root. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
+
+/* ---- the shared shelf for friends' tips ----------------------------------
+   Paste the /exec URL of the Apps Script deployment here and every guest's
+   recommendation is posted to your Google Sheet, and every row you tick as
+   approved comes back down onto everyone's map. apps-script/README.md walks
+   through the five minutes of setup. Leave it empty and the guide still
+   works exactly as before: tips live on the guest's own device and reach you
+   by email, they just don't reach each other. ------------------------------ */
+const REC_ENDPOINT = '';
 
 /* guest identity + their recommendations, remembered on this device */
 const store = {
@@ -1702,14 +1754,32 @@ const ORDER = ["all","wedding","favourites","coffee","slowbar","food","friends"]
 /* "Our Favourites" is a flag, not a category — every other tab matches on category. */
 const matchesCat = (p,cat) => cat==='all' ? true : cat==='favourites' ? !!p.fav : p.category===cat;
 
-/* merged data: curated PLACES + this guest's own recommendations */
-let ALL = [];
+/* merged data: curated PLACES + the approved tips from the sheet + this guest's own.
+   SHARED arrives asynchronously and may echo a tip this device already holds, so
+   local recs are dropped once their id comes back approved — otherwise the guest
+   who sent it would see their own pin twice. */
+let ALL = [], SHARED = [];
+/* Cards and popups are built with innerHTML, and the curated PLACES below are
+   written by us, so they may carry entities and the odd tag on purpose. A
+   friend's words are not ours, and once tips are shared they render in every
+   other guest's browser — so everything a guest typed is escaped here, at the
+   single door all friend data comes through, and their link is allowed only if
+   it really is http(s). */
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => { try{ const p=new URL(String(u)); return (p.protocol==='http:'||p.protocol==='https:')?p.href:''; }catch(e){ return ''; } };
+
+const recAsPlace = r => {
+  const by=esc(r.by), why=esc(r.why);
+  return {
+    category:'friends', name:esc(r.place), area: by ? `by ${by}` : 'by a friend',
+    coords:r.coords || null, blurb:why, story:why, url:safeUrl(r.url),
+    note:`A tip from ${by || 'a friend'} — terima kasih!`
+  };
+};
 function refreshAll(){
-  ALL = PLACES.concat(store.recs.map(r => ({
-    category:'friends', name:r.place, area: r.by ? `by ${r.by}` : 'by a friend',
-    coords:r.coords || null, blurb:r.why, story:r.why,
-    note:`A tip from ${r.by || 'a friend'} — terima kasih!`
-  })));
+  const landed=new Set(SHARED.map(r=>String(r.id)));
+  const mine=store.recs.filter(r=>!landed.has(String(r.t)));
+  ALL = PLACES.concat(SHARED.map(recAsPlace), mine.map(recAsPlace));
 }
 refreshAll();
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
@@ -2098,29 +2168,228 @@ if(!store.name && !store.skippedWelcome){
   personalize();
 }
 
-/* ---- a friend's recommendation: save locally, pin via geocoding, email to us ---- */
+/* ---- a friend's recommendation ------------------------------------------
+   The guest types, Photon answers with real OpenStreetMap places, and picking
+   one carries its exact coordinates into the form. Photon is the free, keyless
+   geocoder komoot runs, and unlike Nominatim it is built for search-as-you-type
+   — Nominatim's usage policy forbids exactly this, which is why the old
+   guess-on-submit lookup has gone. It is also OSM data, like the basemap, so
+   the licence travels with the pin; Google's Places autocomplete could not be
+   used here at any price, as its terms forbid showing Places results on a
+   non-Google map, and this map is MapLibre.
+
+   OSM has never heard of half the good warungs in this city, so the dropdown
+   is only the fast path: #rec-mini lets anyone drop the pin by hand, and that
+   is the one route that always works. ------------------------------------- */
 const recForm=document.getElementById('rec-form');
 const recStatus=document.getElementById('rec-status');
+const recPlaceInput=document.getElementById('rec-place');
+const recLinkInput=document.getElementById('rec-link');
+const recSuggestEl=document.getElementById('rec-suggest');
+const recPinState=document.getElementById('rec-pin-state');
+const recPinToggle=document.getElementById('rec-pin-toggle');
+const recMini=document.getElementById('rec-mini');
 
-function geocodeRec(rec){
-  /* best effort: find the place on the map so it gets a real pin. Guests won't
-     know coordinates, so we ask OpenStreetMap's free geocoder and sanity-check
-     the hit is actually around Yogyakarta before pinning it. */
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(rec.place+', Yogyakarta, Indonesia')}`)
-    .then(r=>r.ok?r.json():[])
-    .then(hits=>{
-      if(!hits.length) return;
-      const lat=+hits[0].lat, lon=+hits[0].lon;
-      if(lat<-8.4||lat>-7.2||lon<110.0||lon>110.9) return;
-      const recs=store.recs;
-      const mine=recs.find(x=>x.t===rec.t);
-      if(!mine) return;
-      mine.coords=[lat,lon];
-      store.recs=recs;
-      refreshAll();
-      if(active==='friends'||active==='all') renderMarkers(active);
+/* Yogyakarta and its ring of regencies — anything outside is a wrong hit */
+const JOGJA={lat:-7.797, lon:110.370, min:[-8.4,110.0], max:[-7.2,110.9]};
+const inJogja=(lat,lon)=>lat>=JOGJA.min[0]&&lat<=JOGJA.max[0]&&lon>=JOGJA.min[1]&&lon<=JOGJA.max[1];
+
+let recCoords=null;        /* [lat,lng] once the guest has settled on a spot */
+let recCoordsFrom='';      /* 'list' or 'pin' — only for the wording below */
+
+const PIN_PROMPT   = `Type a few letters and pick it from the list, so it lands on the right corner.`;
+const PIN_NOTFOUND = `OpenStreetMap hasn't heard of this one — tap <b>Place the pin myself</b> to show us where it is.`;
+
+function setRecCoords(coords, label, from){
+  recCoords=coords; recCoordsFrom=from;
+  recPinState.classList.toggle('set', !!coords);
+  recPinState.innerHTML = coords
+    ? (from==='pin' ? `Pinned where you put it. <b>${esc(label)||'On the map'}</b>` : `Found it — <b>${esc(label)}</b>`)
+    : PIN_PROMPT;
+  recPinToggle.textContent = coords ? 'Move the pin' : 'Place the pin myself';
+  if(miniMarker && coords) miniMarker.setLngLat([coords[1],coords[0]]);
+}
+
+/* ---- the dropdown ---- */
+let recAbort=null, recTimer=null, recHits=[], recCursor=-1;
+
+const photonLabel=p=>{
+  const bits=[p.street&&(p.housenumber?`${p.street} ${p.housenumber}`:p.street), p.district, p.city||p.county, p.state]
+    .filter(Boolean);
+  return [...new Set(bits)].slice(0,3).join(' · ');
+};
+
+function closeSuggest(){
+  recSuggestEl.hidden=true; recSuggestEl.innerHTML='';
+  recPlaceInput.setAttribute('aria-expanded','false');
+  recPlaceInput.removeAttribute('aria-activedescendant');
+  recHits=[]; recCursor=-1;
+}
+
+function paintSuggest(){
+  recSuggestEl.innerHTML=recHits.map((h,i)=>
+    `<li id="rec-opt-${i}" role="option" aria-selected="${i===recCursor}"><b>${esc(h.name)}</b>${h.sub?`<small>${esc(h.sub)}</small>`:''}</li>`
+  ).join('');
+  [...recSuggestEl.children].forEach((li,i)=>{
+    li.addEventListener('mousedown', ev=>{ ev.preventDefault(); pickHit(i); });
+  });
+  recSuggestEl.hidden=false;
+  recPlaceInput.setAttribute('aria-expanded','true');
+}
+
+function moveCursor(step){
+  if(!recHits.length) return;
+  recCursor=(recCursor+step+recHits.length)%recHits.length;
+  [...recSuggestEl.children].forEach((li,i)=>li.setAttribute('aria-selected', i===recCursor));
+  recPlaceInput.setAttribute('aria-activedescendant', `rec-opt-${recCursor}`);
+  recSuggestEl.children[recCursor]?.scrollIntoView({block:'nearest'});
+}
+
+function pickHit(i){
+  const h=recHits[i]; if(!h) return;
+  recPlaceInput.value=h.name;
+  document.getElementById('f-place').classList.remove('invalid');
+  setRecCoords(h.coords, h.sub||h.name, 'list');
+  closeSuggest();
+  if(!recMini.hidden) centreMini();
+}
+
+function searchPlaces(q){
+  if(recAbort) recAbort.abort();
+  recAbort=new AbortController();
+  const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`+
+            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&zoom=12&limit=8&lang=en`;
+  fetch(url,{signal:recAbort.signal})
+    .then(r=>r.ok?r.json():null)
+    .then(data=>{
+      if(!data||!data.features) return closeSuggest();
+      recHits=data.features
+        .map(f=>({
+          name:f.properties.name||f.properties.street||'',
+          sub:photonLabel(f.properties),
+          coords:[f.geometry.coordinates[1], f.geometry.coordinates[0]]
+        }))
+        .filter(h=>h.name && inJogja(h.coords[0], h.coords[1]))
+        .slice(0,6);
+      recCursor=-1;
+      if(!recHits.length){
+        /* No shame in this — OSM simply doesn't know every warung. Say so on the
+           line below rather than in the dropdown: the dropdown hangs directly over
+           the "place the pin myself" button, so a message there would cover the very
+           thing it's telling them to press. */
+        closeSuggest();
+        if(!recCoords) recPinState.innerHTML=PIN_NOTFOUND;
+        return;
+      }
+      if(!recCoords) recPinState.innerHTML=PIN_PROMPT;   /* clear a stale "not found" */
+      paintSuggest();
     })
-    .catch(()=>{});
+    .catch(err=>{ if(err.name!=='AbortError') closeSuggest(); });
+}
+
+recPlaceInput.addEventListener('input', ()=>{
+  const q=recPlaceInput.value.trim();
+  if(recCoordsFrom==='list') setRecCoords(null,'','');   /* they've moved on from the chosen place */
+  clearTimeout(recTimer);
+  if(q.length<3) return closeSuggest();
+  recSuggestEl.innerHTML=`<li class="rec-searching">Looking…</li>`;
+  recSuggestEl.hidden=false;
+  recTimer=setTimeout(()=>searchPlaces(q), 260);   /* debounced, so komoot's free service isn't hammered */
+});
+
+recPlaceInput.addEventListener('keydown', e=>{
+  if(recSuggestEl.hidden) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); moveCursor(1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); moveCursor(-1); }
+  else if(e.key==='Enter' && recCursor>-1){ e.preventDefault(); pickHit(recCursor); }
+  else if(e.key==='Escape'){ closeSuggest(); }
+});
+recPlaceInput.addEventListener('blur', ()=>setTimeout(closeSuggest, 120));
+
+/* ---- the fallback: drop the pin by hand ---- */
+let miniMap=null, miniMarker=null;
+
+function centreMini(){
+  if(!miniMap) return;
+  const c=recCoords||[JOGJA.lat, JOGJA.lon];
+  miniMap.setCenter([c[1],c[0]]);
+  miniMap.setZoom(recCoords?15.5:11.5);
+}
+
+function initMini(){
+  miniMap=new maplibregl.Map({
+    container:'rec-mini-map',
+    style:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+    center:[recCoords?recCoords[1]:JOGJA.lon, recCoords?recCoords[0]:JOGJA.lat],
+    zoom:recCoords?15.5:11.5,
+    attributionControl:true, dragRotate:false, pitchWithRotate:false
+  });
+  miniMap.touchZoomRotate.disableRotation();
+  miniMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+
+  const el=document.createElement('div');
+  el.className='pin show'; el.style.setProperty('--pin-color', CATS.friends.color);
+  el.innerHTML=`<div class="pill">Your pin</div>`;
+  miniMarker=new maplibregl.Marker({element:el, anchor:'center', draggable:true})
+    .setLngLat([recCoords?recCoords[1]:JOGJA.lon, recCoords?recCoords[0]:JOGJA.lat])
+    .addTo(miniMap);
+
+  const settle=lngLat=>setRecCoords([lngLat.lat, lngLat.lng], recPlaceInput.value.trim(), 'pin');
+  miniMarker.on('dragend', ()=>settle(miniMarker.getLngLat()));
+  miniMap.on('click', e=>{ miniMarker.setLngLat(e.lngLat); settle(e.lngLat); });
+}
+
+recPinToggle.addEventListener('click', ()=>{
+  const opening=recMini.hidden;
+  recMini.hidden=!opening;
+  recPinToggle.setAttribute('aria-expanded', String(opening));
+  if(!opening) return;
+  closeSuggest();
+  loadMapLibre(()=>{
+    if(!miniMap) initMini(); else { miniMap.resize(); centreMini(); }
+    requestAnimationFrame(()=>miniMap.resize());
+  });
+});
+
+/* ---- the sheet: post what guests send, pull back what you've approved ---- */
+function loadSharedRecs(){
+  if(!REC_ENDPOINT) return;
+  fetch(REC_ENDPOINT)
+    .then(r=>r.ok?r.json():null)
+    .then(rows=>{
+      if(!Array.isArray(rows)||!rows.length) return;
+      SHARED=rows.filter(r=>r&&r.place).map(r=>({
+        id:r.id, by:r.by, place:r.place, why:r.why, url:r.url||'',
+        coords:(typeof r.lat==='number'&&typeof r.lng==='number'&&inJogja(r.lat,r.lng))?[r.lat,r.lng]:null
+      }));
+      refreshAll();
+      updateTabCounts();
+      renderCards(active);
+      renderMarkers(active);
+    })
+    .catch(()=>{});   /* the sheet being unreachable must never cost the guide its map */
+}
+
+function postRec(rec){
+  if(!REC_ENDPOINT) return Promise.resolve(false);
+  /* text/plain keeps this a "simple" request, so the browser skips the preflight
+     OPTIONS that Apps Script cannot answer */
+  return fetch(REC_ENDPOINT,{
+    method:'POST', mode:'cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(rec)
+  }).then(r=>r.ok).catch(()=>false);
+}
+
+/* the way home when there's no sheet, or the sheet didn't answer. Takes the
+   whole rec, because by the time a failed POST comes back the form has been
+   reset and recCoords is null again. */
+function mailtoFor(rec){
+  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${rec.by}`);
+  const body=encodeURIComponent(`From: ${rec.by}\nPlace: ${rec.place}\nWhy we should try it:\n${rec.why}`+
+    (rec.url?`\nLink: ${rec.url}`:'')+
+    (rec.coords?`\nPinned at: ${rec.coords[0].toFixed(6)}, ${rec.coords[1].toFixed(6)}`:''));
+  return `mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}`;
 }
 
 recForm.addEventListener('submit', e=>{
@@ -2137,25 +2406,45 @@ recForm.addEventListener('submit', e=>{
   if(firstInvalid){ firstInvalid.focus(); return; }
 
   if(by && !store.name){ store.name=by; personalize(); }
-  const rec={ t:Date.now(), by, place, why, coords:null };
+  const url=safeUrl(recLinkInput.value.trim());
+  const rec={ t:Date.now(), by, place, why, url, coords:recCoords };
   store.recs=store.recs.concat([rec]);
   refreshAll();
   updateTabCounts();
   if(active==='friends'||active==='all'){ renderCards(active); renderMarkers(active); }
-  geocodeRec(rec);
 
-  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${by}`);
-  const body=encodeURIComponent(`From: ${by}\nPlace: ${place}\nWhy we should try it:\n${why}`);
-  recStatus.innerHTML=`Terima kasih, ${by}! Your tip is saved on this device and now lives under <b>From Friends</b> on the map.<br>`+
-    `<a class="link-u" href="mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
-    `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  /* it shows on their own map either way; the sheet is what carries it to
+     everyone else, once you've approved the row */
+  const pinned = recCoords
+    ? `Your tip is pinned under <b>From Friends</b> on the map.`
+    : `Your tip is on the map under <b>From Friends</b> — without a pin, so we'll place it ourselves.`;
+
+  if(REC_ENDPOINT){
+    recStatus.innerHTML=`Terima kasih, ${esc(by)}! Sending it over…`;
+    postRec(rec).then(ok=>{
+      recStatus.innerHTML = ok
+        ? `Terima kasih, ${esc(by)}! ${pinned} It's with Hilga &amp; Lucas now — once they've read it, every other guest sees it too.`
+        : `Terima kasih, ${esc(by)}! ${pinned}<br>`+
+          `<a class="link-u" href="${mailtoFor(rec)}">It didn't reach us though — send it by email instead <span>&rarr;</span></a>`;
+    });
+  } else {
+    recStatus.innerHTML=`Terima kasih, ${esc(by)}! ${pinned}<br>`+
+      `<a class="link-u" href="${mailtoFor(rec)}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
+      `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  }
+
   recForm.reset();
+  setRecCoords(null,'','');
+  closeSuggest();
+  recMini.hidden=true;
+  recPinToggle.setAttribute('aria-expanded','false');
   if(store.name) recByInput.value=store.name;
 });
 
 addEventListener('load', ()=>{
   renderCards(active);
   mapObserver.observe(document.querySelector('.map-shell'));
+  loadSharedRecs();
 
   /* PWA: register the service worker (relative path keeps scope at this folder,
      so it works on a domain root or a GitHub Pages project subpath). Only runs
