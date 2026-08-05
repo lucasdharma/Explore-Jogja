@@ -2216,13 +2216,39 @@ let recCoords=null;        /* [lat,lng] once the guest has settled on a spot */
 let recCoordsFrom='';      /* 'list' or 'pin' — only for the wording below */
 
 const PIN_PROMPT   = `Type a few letters and pick it from the list, so it lands on the right corner.`;
-const PIN_NOTFOUND = `OpenStreetMap hasn't heard of this one — tap <b>Place the pin myself</b> to show us where it is.`;
+const PIN_NOTFOUND = `OpenStreetMap hasn't heard of this one — paste its Google Maps link below, or tap <b>Place the pin myself</b>.`;
+
+/* A Google Maps link a guest pasted already carries the place's coordinates, so
+   read them rather than making them repeat the work on our little map. Two forms
+   matter: !3d…!4d… is the place's own pin, while @… is only where the map happened
+   to be centred, so the former is tried first and the latter is the fallback.
+   Phone "share" links (maps.app.goo.gl) are short and resolve only by following a
+   redirect, which the browser won't let us do from another origin — those still
+   need the pin dropped by hand, and the link is kept for directions regardless. */
+function coordsFromMapsUrl(u){
+  const s=String(u||'');
+  const patterns=[
+    /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/,
+    /[?&](?:q|query|ll|center|destination|daddr)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/
+  ];
+  for(let i=0;i<patterns.length;i++){
+    const m=s.match(patterns[i]);
+    if(m){
+      const la=+m[1], ln=+m[2];
+      if(isFinite(la)&&isFinite(ln)&&inJogja(la,ln)) return [la,ln];
+    }
+  }
+  return null;
+}
 
 function setRecCoords(coords, label, from){
   recCoords=coords; recCoordsFrom=from;
   recPinState.classList.toggle('set', !!coords);
   recPinState.innerHTML = coords
-    ? (from==='pin' ? `Pinned where you put it. <b>${esc(label)||'On the map'}</b>` : `Found it — <b>${esc(label)}</b>`)
+    ? (from==='pin'  ? `Pinned where you put it. <b>${esc(label)||'On the map'}</b>`
+    :  from==='link' ? `Pinned from your link — <b>${esc(label)||'we have the spot'}</b>`
+    :  `Found it — <b>${esc(label)}</b>`)
     : PIN_PROMPT;
   recPinToggle.textContent = coords ? 'Move the pin' : 'Place the pin myself';
   if(miniMarker && coords) miniMarker.setLngLat([coords[1],coords[0]]);
@@ -2275,8 +2301,14 @@ function pickHit(i){
 function searchPlaces(q){
   if(recAbort) recAbort.abort();
   recAbort=new AbortController();
+  /* bbox, not just a lat/lon bias. Biasing only re-ranks a worldwide search, so a
+     limit of 8 could come back as eight Thai restaurants in Thailand and the one
+     in Jogja ranked ninth — and the filter below would then throw away the lot,
+     leaving an empty dropdown for a place that is genuinely on the map. Bounding
+     the search means every slot returned is a slot in Yogyakarta. */
   const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`+
-            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&zoom=12&limit=8&lang=en`;
+            `&bbox=${JOGJA.min[1]},${JOGJA.min[0]},${JOGJA.max[1]},${JOGJA.max[0]}`+
+            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&limit=8&lang=en`;
   fetch(url,{signal:recAbort.signal})
     .then(r=>r.ok?r.json():null)
     .then(data=>{
@@ -2323,6 +2355,15 @@ recPlaceInput.addEventListener('keydown', e=>{
   else if(e.key==='Escape'){ closeSuggest(); }
 });
 recPlaceInput.addEventListener('blur', ()=>setTimeout(closeSuggest, 120));
+
+/* a pasted link can pin the place on its own — the commonest way out when the
+   dropdown has nothing, since the guest has usually just found it on their phone */
+function readLinkPin(){
+  const found=coordsFromMapsUrl(recLinkInput.value.trim());
+  if(found) setRecCoords(found, recPlaceInput.value.trim(), 'link');
+}
+recLinkInput.addEventListener('input', readLinkPin);
+recLinkInput.addEventListener('paste', ()=>setTimeout(readLinkPin, 0));
 
 /* ---- the fallback: drop the pin by hand ---- */
 let miniMap=null, miniMarker=null;
@@ -2411,6 +2452,22 @@ function refreshShared(){
 }
 document.addEventListener('visibilitychange', refreshShared);
 addEventListener('focus', refreshShared);
+
+/* Coming back to the tab is not enough on its own: a guest reading the guide with
+   it already open never fires either event, and would sit on stale tips for as
+   long as they stayed. So ask again on a slow beat while the page is actually
+   being looked at — and stop asking once it has been left untouched for a
+   quarter of an hour, so a tab forgotten overnight isn't still knocking at the
+   sheet by morning. */
+let lastTouch=Date.now();
+['pointerdown','keydown','scroll'].forEach(ev=>
+  addEventListener(ev, ()=>{ lastTouch=Date.now(); }, {passive:true}));
+
+setInterval(()=>{
+  if(document.visibilityState!=='visible') return;
+  if(Date.now()-lastTouch > 900000) return;
+  loadSharedRecs();
+}, 60000);
 
 function postRec(rec){
   if(!REC_ENDPOINT) return Promise.resolve(false);
