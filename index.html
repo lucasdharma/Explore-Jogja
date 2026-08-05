@@ -1446,7 +1446,13 @@ const CHIME_TUNE = {
    Coordinates marked APPROX were placed from the street address rather than read off
    Google Maps, so the pin may sit a short way from the door — the `url` link is exact
    either way. Replace them by right-clicking the place in Google Maps and copying the
-   lat/long at the top of the menu.
+   lat/long at the top of the menu; take the !3d/!4d pair out of the resulting URL rather
+   than the @ triple, which is only where the viewport happened to be sitting.
+
+   Treat a street address as worth roughly a neighbourhood, not a doorway: Estuary was
+   1.8km out that way before its real coordinates arrived, because the address named a
+   lane off Jl. Monjali and the lane runs a long way. The four APPROX pins left are all
+   on short, named streets, which is the case where the guess actually holds up.
 
    The two wedding pins are APPROX but not guesses: both roads number their addresses in
    kilometres, so each was triangulated along its road from a fixed point. The church sits
@@ -1506,12 +1512,12 @@ const PLACES = [
     blurb:"A proper French patisserie, ten minutes from Tugu.",
     story:"A patisserie and brasserie on Jl. Kranggan doing the French things properly — laminated pastry, tarts, a full brasserie menu — in a bright room just north of Tugu. Open from breakfast until late.",
     note:"Come for the viennoiserie in the morning, before the counter is picked over." },
-  { category:"coffee", name:"Estuary Café", area:"Gemawang · Sinduadi", coords:[-7.7477,110.3737] /* APPROX — url is authoritative, coords still unverified */,
+  { category:"coffee", name:"Estuary Café", area:"Gemawang · Sinduadi", coords:[-7.7634102,110.3698868],
     url:"https://maps.app.goo.gl/sn9n8bxcutR1Rcck7",
     blurb:"Concrete, greenery and the Code river below.",
     story:"Hidden down a gang off Jl. Monjali and built out over the bank of Kali Code: an industrial, concrete-finish room that opens onto trees and river. Far greener and quieter than the address suggests.",
     note:"Ask for a table on the river side. The lane in is narrow — go slowly, it is worth it." },
-  { category:"coffee", name:"99 Coffee Roaster", area:"Gejayan · Jl. Affandi", coords:[-7.7604,110.3900] /* APPROX — url is authoritative, coords still unverified */,
+  { category:"coffee", name:"99 Coffee Roaster", area:"Gejayan · Jl. Affandi", coords:[-7.7612526,110.3937996],
     url:"https://maps.app.goo.gl/uFu6qDDNo45GHebLA",
     blurb:"A big, easy roastery on Gejayan, open from six.",
     story:"The Gejayan branch of a local roastery — generous, high-ceilinged, and busy from early morning until midnight, with their own beans, a full kitchen and enough space to actually get something done.",
@@ -1595,11 +1601,6 @@ const PLACES = [
     blurb:"Mediterranea's younger sibling, next door.",
     story:"Chef Kamil's second room, literally next door to Mediterranea: western cooking with an Asian hand, lighter and more playful than the original — the duck sate is the dish people come back for.",
     note:"If Mediterranea is full, walk one door up. The sate bebek is the order." },
-  { category:"food", name:"Kim's Bar & Kitchen", area:"Randugowang · Sendangadi", coords:[-7.7419,110.3662] /* APPROX — url is authoritative, coords and area still unverified */,
-    url:"https://maps.app.goo.gl/zcp3WZvNjfWmwt556",
-    blurb:"A tropical, Bali-ish garden room out north.",
-    story:"An open-air bar and kitchen up in Mlati with a tropical-modern feel — timber, earth tones, a lot of plants — serving Japanese and western plates, pizza and steak, with a proper drinks list.",
-    note:"Best at sunset, outdoors. Easy parking, unlike anywhere in the centre." },
 ];
 
 /* color = accent used on pins/card dots (light, decorative). active = darker shade used behind
