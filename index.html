@@ -17,10 +17,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Our Yogyakarta" />
 
+<link rel="preload" as="image" href="assets/joglo-roof-eave.png" media="(min-width: 761px)" fetchpriority="high" />
+<link rel="preload" as="image" href="assets/joglo-roof-eave-820.png" media="(max-width: 760px)" fetchpriority="high" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+<!-- Aksara Jawa for the curtain. Requested with &text= narrowed to the 42
+     characters the corpus actually uses, which takes Noto Sans Javanese from
+     153KB (Google serves this family as TTF only) down to about 12KB. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Javanese:wght@400;500&text=%21%2C-.KLY%C3%A8%C3%A9%EA%A6%81%EA%A6%83%EA%A6%84%EA%A6%86%EA%A6%88%EA%A6%8C%EA%A6%8E%EA%A6%8F%EA%A6%92%EA%A6%95%EA%A6%97%EA%A6%9A%EA%A6%9F%EA%A6%A0%EA%A6%A1%EA%A6%A2%EA%A6%A4%EA%A6%A5%EA%A6%A7%EA%A6%A9%EA%A6%AA%EA%A6%AB%EA%A6%AD%EA%A6%AE%EA%A6%B0%EA%A6%B1%EA%A6%B2%EA%A6%B4%EA%A6%B6%EA%A6%B8%EA%A6%BA%EA%A6%BB%EA%A7%80&display=swap" rel="stylesheet" />
 
 <!-- MapLibre GL (open-source, no API key needed) is loaded lazily in-script, just before the map scrolls into view -->
 
@@ -28,13 +34,71 @@
 :root{
   --surface:#F1EDE6; --surface-2:#E9E3D8; --paper:#FAF7F0; --white:#FFFFFF;
   --ink:#2B2924; --ink-2:#413D36; --muted:#5E594F; --line:#DAD4C7; --line-2:#BFB8A8;
-  --hero-img:none;
   --serif:"Cormorant Garamond", Georgia, serif; --sans:"Jost", system-ui, sans-serif;
+  --javanese:"Noto Sans Javanese", var(--serif);
+  /* The falling script has its own colour token so it can be tuned without
+     touching the foreground --ink. Near-black rather than pure #000: a hair of
+     warmth keeps it in the cream/terracotta palette instead of reading cold. */
+  --script-ink:#1B1712;
   --maxw:1320px; --gutter:64px; --section-gap:150px;
+
+  /* ===== HERO TUNING — the doorway =====
+     Aim the light from here; every shadow layer is derived from these three.
+     The curtain's physics and the wind chime are tuned in CURTAIN_TUNE, at
+     the top of the script. */
+  --sun-azimuth:31deg;    /* which way the light leans the cast shadow */
+  --sun-elevation:.53;    /* 0 = low sun, long shadow · 1 = overhead, short */
+  --shadow-ink:#5C3F27;   /* warm umber. The wall is warm, so the shadow is too — never neutral black */
+  --shadow-opacity:.38;   /* the cast shadow overall (0.30–0.42 reads best) */
+  --shadow-contact:.17;   /* shade under the overhang, where the roof meets the curtain */
+  --shadow-dx:0px; --shadow-dy:0px;     /* small offset applied after the projection */
+
+  /* The roof hangs as an object in the frame with air around it, rather than
+     bleeding to the edges — the silhouette is the point, so it stays whole and
+     the wall is allowed to be empty. Everything else is derived from its width:
+     the eave line is where the curtain hangs from, and the curtain is narrower
+     than the roof so it reads as hanging in a doorway under it. */
+  --roof-w:min(44vw, 620px);
+  --roof-aspect:1498 / 658;             /* joglo-roof-eave.png, trimmed to its silhouette */
+  --roof-h:calc(var(--roof-w) * 658 / 1498);
+  --roof-top:clamp(104px,13vh,150px);   /* floats clear of the nav */
+  --eave:calc(var(--roof-top) + var(--roof-h));
+  --curtain-w:calc(var(--roof-w) * .82);
+  --curtain-end:90%;     /* how far down the hero the cloth hangs. It ends on its own hem
+                            rather than being sliced off by the bottom of the section */
+
+  /* The column of type that fits to the LEFT of the doorway, used as a hard cap on
+     the hero copy so the weave is never read through — the script has to hang whole,
+     and the keep-out that protects the copy (see `keep` in the script) is measured
+     off these boxes, so every pixel the copy claims is a pixel cut out of the cloth.
+     .wrap is centred, so the copy's own left edge and the viewport share a centre:
+     the cloth's left edge is 50% - --curtain-w / 2 measured from there. Stated as a
+     percentage rather than in vw on purpose — vw counts the scrollbar and the canvas
+     does not, which would drift the two apart by the scrollbar's width.
+     The subtracted term is the air between the last letter and the first strand; it
+     also has to cover the half glyph-box the outermost column of script is stamped
+     with, which reaches ~12px further left than the weave's nominal edge. */
+  --hero-col:calc(50% - var(--curtain-w) / 2 - clamp(28px, 3vw, 52px));
+
+  /* Derived: how far the silhouette is thrown down the wall. A lower sun
+     (smaller elevation) throws it further. */
+  --shadow-len:calc(.86 / var(--sun-elevation));
+  --roof-src:url("assets/joglo-roof-eave.png");
 }
+@media(max-width:760px){ :root{
+  --roof-src:url("assets/joglo-roof-eave-820.png");
+  --roof-w:min(86vw,420px); --roof-top:clamp(78px,10vh,110px); --curtain-w:calc(var(--roof-w) * .88);
+ } }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
-body{margin:0; background:var(--surface); color:var(--ink); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
+/* The linen weave runs across the whole page. It used to live only on the hero's
+   wall, so the texture stopped dead at the bottom of the hero and the rest of the
+   site read as a different page. */
+body{margin:0; color:var(--ink);
+  background-color:var(--surface);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(118,97,68,.085) 0 1px, rgba(118,97,68,0) 1px 3px),
+    repeating-linear-gradient(0deg,  rgba(118,97,68,.07)  0 1px, rgba(118,97,68,0) 1px 3px); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden; overflow-x:clip}
 h1,h2,h3{font-family:var(--serif); font-weight:300; margin:0; line-height:1.08}
 p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; display:block}
 :focus-visible{outline:1px solid var(--ink); outline-offset:4px}
@@ -52,15 +116,14 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* ===== NAV ===== */
 .nav{position:fixed; top:0; left:0; width:100%; z-index:1000; transition:background .5s ease, border-color .5s ease}
 .nav-inner{position:relative; display:flex; align-items:center; justify-content:space-between; height:78px}
-.nav a{text-decoration:none; color:#F3EFE8; transition:color .5s}
+/* The roof floats clear of the nav, so the bar sits on linen the whole way down
+   the page and stays in ink; .solid only draws the background behind it. */
+.nav a{text-decoration:none; color:var(--ink); transition:color .5s}
 .nav-left{font-family:var(--sans); font-size:11px; letter-spacing:.24em; text-transform:uppercase}
 .wordmark{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:var(--serif); font-weight:400; font-size:22px; letter-spacing:.42em; padding-left:.42em; white-space:nowrap}
-.nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid rgba(243,239,232,.5); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
-.nav-btn:hover{background:#F3EFE8; color:var(--ink)}
+.nav-btn{display:inline-flex; align-items:center; min-height:44px; font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase; border:1px solid var(--line-2); padding:12px 24px; transition:background .35s, color .35s, border-color .35s}
+.nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
 .nav.solid{background:var(--surface); border-bottom:1px solid var(--line)}
-.nav.solid a{color:var(--ink)}
-.nav.solid .nav-btn{border-color:var(--line-2)}
-.nav.solid .nav-btn:hover{background:var(--ink); color:var(--surface); border-color:var(--ink)}
 @media(max-width:760px){
   .nav-inner{height:64px}
   .nav-left{display:none}
@@ -69,68 +132,271 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   .nav-btn{padding:9px 14px; font-size:10px; letter-spacing:.14em}
 }
 
-/* ===== HERO ===== */
-.hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end}
-.hero-scene{position:absolute; inset:0; transform:scale(1.02); animation:kb 26s ease-in-out infinite alternate;
-  background:
-    radial-gradient(120% 80% at 74% 66%, rgba(255,214,158,.85) 0%, rgba(255,214,158,0) 42%),
-    linear-gradient(180deg, #2f3550 0%, #45435c 24%, #6d5a62 44%, #a2766a 58%, #d29a74 68%, #ecc498 76%, #f3d7ac 82%)}
-.hero-photo{position:absolute; inset:0; background-image:var(--hero-img); background-size:cover; background-position:center; transform:scale(1.02); animation:kb 26s ease-in-out infinite alternate}
-@keyframes kb{to{transform:scale(1.09)}}
-.hero-ridge{position:absolute; left:0; right:0; bottom:0; width:100%; height:66%; display:block}
-.hero-scrim{position:absolute; inset:0; background:linear-gradient(180deg, rgba(20,18,24,.28) 0%, rgba(20,18,24,0) 30%, rgba(20,18,24,0) 55%, rgba(20,18,24,.55) 100%)}
-.hero-content{position:relative; z-index:3; color:#F5F1EA; padding-bottom:clamp(48px,9vh,110px); width:100%}
-.hero-content .eyebrow{color:rgba(245,241,234,.82); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
-.hero-title{margin-top:20px; font-size:clamp(46px,9.5vw,116px); font-weight:300; letter-spacing:-.01em; line-height:1; color:#F7F3EC; opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
-.hero-title em{font-style:italic}
-.hero-lede{max-width:440px; margin-top:26px; color:rgba(245,241,234,.9); font-family:var(--sans); font-weight:300; font-size:16px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
-.hero-link{margin-top:34px; color:#F5F1EA; opacity:0; transform:translateY(14px); animation:fade 1.3s .75s ease forwards}
-@keyframes fade{to{opacity:1; transform:none}}
-.scrollcue{position:absolute; left:50%; bottom:26px; transform:translateX(-50%); z-index:3; color:rgba(245,241,234,.75); text-decoration:none; font-size:20px; animation:bob 2s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,7px)}}
-/* hero illustration life: slowly drifting clouds + summit plume + blossom branch */
-.cloud-a{animation:drifta 64s ease-in-out infinite alternate}
-.cloud-b{animation:driftb 82s ease-in-out infinite alternate}
-.plume{animation:plumef 18s ease-in-out infinite alternate}
-@keyframes drifta{to{transform:translateX(36px)}}
-@keyframes driftb{to{transform:translateX(-44px)}}
-@keyframes plumef{to{transform:translateX(-14px)}}
-.hero-flora{position:absolute; top:66px; right:0; width:clamp(190px, 26vw, 350px); height:auto; z-index:2; pointer-events:none}
-@media(max-width:760px){ .hero-flora{top:72px; width:52vw; max-width:230px} }
+/* ===== HERO — a doorway on a still, hot afternoon =====
+   Layers, back to front:
+     0  the wall            .wall
+     1  the roof's shadow   .rshadow  (multiply onto the wall)
+     2  the string cloth    .curtain  (canvas)
+     3  the roof            .roof
+     4  UI                  .hero-veil, .hero-content, .mute, .scrollcue
 
-/* ===== NOTE — the floating gallery =====
-   A tall scroll track with a sticky 100svh stage. The quote stays pinned in the
-   centre while photos drift past at different 3D depths (CSS perspective +
-   scroll-driven transforms in JS), so the pictures move with the scroll wheel. */
-.note{position:relative; height:260vh; padding:0}
-.note-sticky{position:sticky; top:0; height:100svh; overflow:hidden; display:flex; align-items:center; justify-content:center; perspective:1100px}
-.note-quote{position:relative; z-index:2; text-align:center}
-.note .eyebrow{color:var(--muted)}
-.note .rule{width:1px; height:56px; background:var(--line-2); margin:0 auto 40px}
-.note p{font-family:var(--serif); font-weight:300; font-style:italic; font-size:clamp(26px,3.6vw,40px); line-height:1.45; max-width:900px; margin:26px auto 0; color:var(--ink)}
-.note .sign{margin-top:34px; color:var(--muted)}
-.note-floats{position:absolute; inset:0; z-index:1; pointer-events:none; transform-style:preserve-3d}
-.gfloat{position:absolute; left:var(--x); top:var(--y); width:var(--w); margin:0; padding:9px 9px 12px;
-  background:var(--paper); border:1px solid var(--line); box-shadow:0 14px 40px rgba(40,36,30,.18);
-  transform:rotate(var(--rot)); will-change:transform}
-.gfloat.front{z-index:3}
-.gfloat img{width:100%; height:auto; display:block; filter:saturate(.9)}
-.gfloat figcaption{margin-top:8px; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--muted); text-align:center; line-height:1.3}
+   The cloth sits ABOVE the shadow: the shadow reads on the wall and through the
+   gaps in the weave, and the glyphs keep one even ink instead of being darkened
+   wherever the shadow crossed them. (Swapping these two z-indexes puts the
+   shadow back on top of the cloth.)
+
+   .hero itself must NOT create a stacking context (no z-index, no filter, no
+   opacity): the shadow layers blend with the wall through mix-blend-mode, and an
+   isolating ancestor would trap that blending. */
+.hero{position:relative; height:100svh; min-height:600px; overflow:hidden; display:flex; align-items:flex-end}
+
+/* 0 — the wall: only the light falling on it. The weave itself comes from <body>
+   and shows through, so the hero is lit linen rather than a different surface. */
+.wall{position:absolute; inset:0; z-index:0;
+  background:
+    radial-gradient(88% 62% at 50% 4%, rgba(255,248,232,.8) 0%, rgba(255,248,232,0) 64%),
+    linear-gradient(180deg, rgba(250,247,240,.55) 0%, rgba(241,237,230,0) 44%, rgba(233,227,216,.45) 100%)}
+
+/* 2 — the cloth, hung in the opening under the roof and narrower than it, so
+   the eaves overhang the strands the way they would over a real doorway. The
+   cloth itself is drawn on this canvas; pointer-events stay off it so the shove
+   is driven from window-level listeners and never blocks a click. */
+/* The canvas fills the hero. A canvas cannot paint outside its own buffer, so
+   sizing it to the weave meant gravity and the 1.1 stretch pulled the lower rows
+   past the bottom edge and they were cut mid-glyph — 71px of them, measured.
+   Filling the hero gives slack on every side instead of only the two the old
+   --curtain-pad covered.
+   The fade down the frame is drawn INTO the canvas (see `fade` in the script)
+   rather than applied here as a CSS mask: masking a canvas that repaints every
+   frame makes the compositor re-mask it every frame too, which cost 7.4ms at p99
+   against 2.6ms for the same result baked in. */
+.curtain{position:absolute; inset:0; width:100%; height:100%; z-index:2; display:block;
+  /* width/height stated outright: <canvas> is a replaced element, so with them on
+     auto it takes its intrinsic 300x150 and the inset offsets are simply dropped. */
+  pointer-events:none; touch-action:none}
+/* Laid out by CSS from the same tokens as the roof, purely so the script can read
+   the weave's resolved geometry: a custom property computes to substituted tokens,
+   not to pixels, so calc(var(--roof-w) * .82) cannot be parsed out of it. */
+.curtain-probe{position:absolute; left:0; top:var(--eave); width:var(--curtain-w);
+  height:calc(var(--curtain-end) - var(--eave));
+  visibility:hidden; pointer-events:none}
+
+/* 1 — the cast shadow. Not a drop-shadow: the roof's own silhouette is used as
+   a mask over a warm umber fill, hinged at the eave line (the asset is trimmed
+   so its bottom edge IS the eave) and thrown down the wall with scaleY(-n).
+   The negative scale is the projection — the apex of the roof lands furthest
+   down the wall, exactly as a real cast shadow would.
+   Three copies, each masked to a different band of the throw, give a penumbra
+   that widens with distance.
+   The mask carries the WHOLE silhouette, not the cropped band the roof shows —
+   the apex is off the top of the screen, but its shadow still has to be thrown
+   down the wall, peak first. So the shadow box keeps the image's full aspect
+   and pins only its bottom edge to the eave. */
+.rshadow{position:absolute; left:calc(50% - var(--roof-w) / 2); top:var(--roof-top);
+  width:var(--roof-w); height:var(--roof-h);
+  z-index:1; pointer-events:none; mix-blend-mode:multiply;
+  background:var(--shadow-ink);
+  -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat;
+  -webkit-mask-position:50% 100%, 50% 0; mask-position:50% 100%, 50% 0;
+  -webkit-mask-size:100% 100%, 100% 100%; mask-size:100% 100%, 100% 100%;
+  -webkit-mask-composite:source-in; mask-composite:intersect;
+  transform-origin:50% 100%;
+  transform:translate(var(--shadow-dx), var(--shadow-dy))
+            skewX(calc(var(--sun-azimuth) + var(--shadow-drift, 0deg)))
+            scaleY(calc(-1 * var(--shadow-len)))}
+
+/* The band gradients are in the element's own space, where 100% is the eave and
+   0% is the apex — so *lower* percentages sit *further* down the wall once the
+   silhouette is flipped. The three overlap rather than abut, or the change in
+   blur shows up as a seam.
+   With the default sun the throw is ~877px, so these land the penumbra between
+   0 and ~530px below the eave and take it to nothing there — the shadow has to
+   run out on the wall, not get cut off by the bottom of the viewport. Re-aiming
+   --sun-elevation lengthens the throw and moves all three together, which is
+   correct: a lower sun throws the shadow further. */
+.rshadow-near{-webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, rgba(0,0,0,.72) 84%, rgba(0,0,0,.45) 100%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 60%, rgba(0,0,0,.72) 84%, rgba(0,0,0,.45) 100%);
+              filter:blur(4px);  opacity:var(--shadow-opacity)}
+.rshadow-mid{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 38%, #000 56%, #000 76%, transparent 90%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 38%, #000 56%, #000 76%, transparent 90%);
+              filter:blur(9px); opacity:calc(var(--shadow-opacity) * .74)}
+.rshadow-far{ -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 22%, #000 44%, transparent 64%);
+              mask-image:var(--roof-src), linear-gradient(to bottom, transparent 2%, #000 22%, #000 44%, transparent 64%);
+              filter:blur(24px); opacity:calc(var(--shadow-opacity) * .46)}
+
+/* the contact shadow — barely thrown, barely blurred, so the roof reads as
+   close to the wall instead of floating in front of it.
+   Its whole silhouette is squeezed into ~21px, so the second mask takes it from
+   solid at the eave to nothing at the bottom of that sliver — without the
+   falloff it ends on a hard line where the near band takes over. */
+.rshadow-contact{
+  -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.55) 62%, #000 100%);
+  mask-image:var(--roof-src), linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.55) 62%, #000 100%);
+  filter:blur(11px); opacity:var(--shadow-contact);
+  transform:translateY(1px) scaleY(-.055)}
+
+/* 3 — the roof. Same box as the shadow, so mask and image stay welded. */
+.roof{position:absolute; left:calc(50% - var(--roof-w) / 2); top:var(--roof-top);
+  width:var(--roof-w); height:var(--roof-h); z-index:3;
+  background-image:var(--roof-src); background-size:100% 100%;
+  background-repeat:no-repeat; pointer-events:none}
+
+/* 4 — UI. The type keeps to a column beside the doorway rather than sitting on
+   top of it; on phones there isn't room for that, so a wash comes back under
+   the text (see the mobile block below). */
+.hero-veil{position:absolute; left:0; right:0; bottom:0; height:46%; z-index:4; pointer-events:none}
+.hero-content{position:relative; z-index:5; color:var(--ink); padding-bottom:clamp(48px,9vh,110px); width:100%}
+.hero-content > *{max-width:var(--hero-col)}
+.hero-content .eyebrow{display:block}   /* it is a <span>, and inline boxes ignore max-width */
+.hero-content .eyebrow{color:var(--muted); opacity:0; transform:translateY(14px); animation:fade 1.2s .2s ease forwards}
+/* "Our Yogyakarta" sets on one line at 6.11em wide, so the size is what decides
+   whether it stays in its column or runs across the doorway. --hero-col caps the
+   box either way, but the cap alone would only fold the title onto a second line —
+   the size has to come down with the column or the headline wraps instead of fits.
+   The column grows by ~0.29px per px of viewport while the type it has to hold is
+   flat-rate, which no plain vw can track; the -15px offset is what bends the ramp
+   to match. Measured 901px–1920px, that leaves the headline 26–66px clear of the
+   first strand and never folds it onto a second line. */
+.hero-title{margin-top:clamp(18px,2.4vh,30px); font-size:clamp(31px, calc(4.6vw - 15px), 46px); font-weight:300; letter-spacing:-.015em; line-height:1.02; color:var(--ink); opacity:0; transform:translateY(18px); animation:fade 1.3s .35s ease forwards}
+.hero-title em{font-style:italic}
+/* no max-width of its own: it takes --hero-col from .hero-content > * like the rest
+   of the copy, so the whole block stops on one line down the left of the doorway */
+.hero-lede{margin-top:clamp(20px,2.6vh,34px); color:var(--ink-2); font-family:var(--sans); font-weight:300; font-size:15px; line-height:1.8; opacity:0; transform:translateY(14px); animation:fade 1.3s .55s ease forwards}
+.hero-link{color:var(--ink)}
+/* One row on the page's own margins: the CTA is the single primary action on the
+   left, the audio toggle and scroll cue a quieter pair on the right, all sharing
+   a baseline instead of being scattered around the corners. */
+.hero-foot{display:flex; align-items:center; justify-content:space-between; gap:24px;
+  width:100%; max-width:none; margin-top:clamp(30px,4.4vh,52px);
+  opacity:0; transform:translateY(14px); animation:fade 1.3s .75s ease forwards}
+.hero-utils{display:flex; align-items:center; gap:clamp(18px,2.4vw,34px)}
+.hero-link{white-space:nowrap} .mute-t{white-space:nowrap}
+@keyframes fade{to{opacity:1; transform:none}}
+.scrollcue{display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px;
+  color:var(--muted); text-decoration:none; font-size:19px; animation:bob 2s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+/* the chime toggle — three struck bars that drop when it is off */
+.mute{display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:8px 2px;
+  background:none; border:0; cursor:pointer; color:var(--muted);
+  font-family:var(--sans); font-size:11px; letter-spacing:.2em; text-transform:uppercase;
+  transition:color .35s}
+.mute:hover{color:var(--ink)}
+.mute-i{display:inline-flex; align-items:flex-start; gap:3px; height:14px}
+.mute-i i{display:block; width:1px; background:currentColor; height:14px; transform-origin:50% 0;
+  transition:height .35s ease, opacity .35s ease}
+.mute-i i:nth-child(2){height:10px} .mute-i i:nth-child(3){height:12px}
+.mute.off .mute-i i{height:4px; opacity:.5}
 @media(max-width:760px){
-  .note{height:210vh}
-  .gfloat{width:calc(var(--w) * .58); padding:6px 6px 8px}
-  .gfloat.front{z-index:1}   /* keep the quote readable: photos always drift behind the text on phones */
-  .gfloat figcaption{font-size:11px; margin-top:5px}
-  .gfloat.hide-m{display:none}
-  /* nudge the two mid-band photos away from the quote's resting position
-     (!important because per-item positions are set as inline style vars) */
-  .note-floats .gfloat:nth-child(3){--y:16% !important}
-  .note-floats .gfloat:nth-child(4){--y:64% !important}
+  .mute{font-size:10px; letter-spacing:.14em}
+  /* not enough width for one row: the CTA takes its own line and the quiet pair
+     sits under it, still on the right margin */
+  .hero-foot{flex-wrap:wrap; gap:18px}
+  .hero-link{flex:0 0 100%}
+  .hero-utils{margin-left:auto; gap:18px}
+}
+/* Below this there is no room for a column of type beside the doorway, so it
+   sits underneath and the curtain is lifted off the words with a wash. This is
+   a wider breakpoint than the mobile one below: it is about whether the layout
+   fits, not about what a phone can afford to render. */
+@media(max-width:900px){
+  /* On a narrow screen the type sits under the doorway rather than beside it, so
+     the cloth has to stop short of it — otherwise the words are read through the
+     weave. */
+  :root{ --curtain-end:64% }
+  .hero-content > *{max-width:none}
+  /* The copy is bottom-anchored, so it cannot simply be pushed down — the only way
+     it starts lower is by taking up less room. Every pixel it gives back is a pixel
+     of strand that the keep-out no longer has to erase, so the spacing tightens here
+     and the strands get the difference. Deliberately not applied above 900px, where
+     the type sits beside the doorway and is not competing with the cloth at all. */
+  .hero-content{padding-bottom:clamp(32px,5.2vh,64px)}
+  .hero-title{margin-top:clamp(12px,1.5vh,20px)}
+  .hero-lede{margin-top:clamp(13px,1.7vh,22px); line-height:1.62}
+  .hero-foot{margin-top:clamp(20px,2.8vh,34px)}
+  /* Full width and the cloth stopped short of it, so there is nothing to clear and
+     the headline goes back to hero scale — the size above is a consequence of the
+     column beside the doorway, not of the type wanting to be small. */
+  .hero-title{font-size:clamp(46px,6.6vw,100px)}
+  .hero-lede{max-width:38ch}
+  .hero-veil{height:52%;
+    background:linear-gradient(180deg, rgba(247,243,235,0) 0%, rgba(247,243,235,.6) 42%, rgba(247,243,235,.9) 74%, rgba(247,243,235,.96) 100%)}
+}
+@media(max-width:760px){
+  /* One blurred layer instead of three. The throw is only ~240px at this size,
+     so the penumbra has little distance to widen over and the stack costs more
+     than it shows — this band covers the whole throw on its own. */
+  .rshadow-near, .rshadow-far{display:none}
+  .rshadow-mid{
+    -webkit-mask-image:var(--roof-src), linear-gradient(to bottom, transparent 10%, #000 42%, #000 88%, rgba(0,0,0,.6) 100%);
+    mask-image:var(--roof-src), linear-gradient(to bottom, transparent 10%, #000 42%, #000 88%, rgba(0,0,0,.6) 100%);
+    filter:blur(10px); opacity:calc(var(--shadow-opacity) * .95)}
+
+  .hero-lede{max-width:34ch}
+  .hero-veil{height:56%}
+}
+
+/* ===== NOTE — the drifting gallery =====
+   A tall scroll track with a sticky 100svh stage. Two dense rows of photographs
+   pass in opposite directions as the page scrolls, with the quote held in the clear
+   band between them.
+
+   The rows and the type are separate rows of a flex column, which is the whole point:
+   the previous version scattered the photos across the same box the quote occupied
+   and relied on luck not to cover it, which it regularly failed to do. Here there is
+   simply nothing where the words are — no keep-out, no scrim, nothing to tune.
+
+   Everything is sized off vh so the three bands always add up to less than the stage:
+   a shorter viewport gets smaller cards rather than a clipped row. */
+.note{position:relative; height:260vh; padding:0; --gw:clamp(96px, 13.5vh, 208px)}
+/* padding-top clears the fixed nav, which is opaque by the time this section is on
+   screen and otherwise sits on top of the first row — it took 35% of it on a short
+   laptop. The card size is keyed to vh so the three bands still add up to less than
+   the stage once that reservation is taken out. */
+.note-sticky{position:sticky; top:0; height:100svh; overflow:hidden; padding-top:clamp(82px,10vh,92px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(12px,2.2vh,40px)}
+.note-quote{position:relative; z-index:2; text-align:center; flex:0 0 auto}
+.note .eyebrow{color:var(--muted)}
+.note .rule{width:1px; height:clamp(24px,4.4vh,56px); background:var(--line-2); margin:0 auto clamp(18px,3vh,40px)}
+/* the vh term is what keeps a wide-but-short laptop honest: on 1440x700 the width
+   alone would ask for the full 38px and push the rows off the stage */
+.note p{font-family:var(--serif); font-weight:300; font-style:italic; font-size:clamp(23px,min(3.4vw,4.6vh),38px); line-height:1.4; max-width:860px; margin:clamp(14px,2vh,26px) auto 0; color:var(--ink)}
+.note .sign{margin-top:clamp(16px,2.6vh,34px); color:var(--muted)}
+
+/* the rows. overflow:hidden is the window; .strip-track is the film passing behind it */
+.note-strip{flex:0 0 auto; width:100%; overflow:hidden; padding:7px 0}
+.strip-track{display:flex; align-items:flex-start; gap:clamp(9px,1vw,18px); width:max-content; will-change:transform}
+.gcard{flex:0 0 auto; width:var(--gw); margin:0; padding:7px 7px 9px;
+  background:var(--paper); border:1px solid var(--line); box-shadow:0 10px 26px rgba(40,36,30,.16);
+  transform:rotate(var(--t,0deg))}
+/* a few degrees of variation so a dense row still reads as hand-laid paper rather
+   than a contact sheet — small enough that the top edges stay a legible line */
+.strip-track .gcard:nth-child(4n+1){--t:-1.2deg}
+.strip-track .gcard:nth-child(4n+2){--t:.9deg}
+.strip-track .gcard:nth-child(4n+3){--t:-.5deg}
+.strip-track .gcard:nth-child(4n+4){--t:1.3deg}
+/* one aspect for every card: a row only reads as a row if the tops and bottoms line
+   up. aspect-ratio also reserves the box before the image lands, so nothing shifts. */
+.gcard img{width:100%; height:auto; aspect-ratio:4/5; object-fit:cover; display:block; filter:saturate(.9)}
+.gcard figcaption{margin-top:6px; font-family:var(--serif); font-style:italic; font-size:clamp(10px,1.35vh,13px); color:var(--muted);
+  text-align:center; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+@media(max-width:760px){ .note{height:210vh} .note-sticky{padding-top:74px} }
+/* Below ~720px of stage the vh term has already bottomed out on the clamp's floor,
+   so the floor itself has to come down or the second row loses a few pixels off the
+   bottom. Small cards are the honest trade in a short window; a clipped row is not. */
+@media(max-height:720px){ .note{--gw:clamp(86px,12.5vh,208px)} }
+/* Two rows and a quote genuinely will not fit in a short stage, however small the
+   cards get — and it is not height alone that decides it: a narrow viewport makes the
+   quote tall, so 390x600 fails while 1440x660 is fine. Both cases below drop to a
+   single row rather than shrink everything into illegibility or clip the second. */
+@media(max-height:560px), (max-width:760px) and (max-height:700px){
+  .note{--gw:clamp(84px,20vh,124px)}
+  .note-sticky{padding-top:62px; gap:10px}
+  .note-strip[data-dir="1"]{display:none}
 }
 @media (prefers-reduced-motion: reduce){
+  /* no sticky stage and no drift — the rows become two plain bands of photographs */
   .note{height:auto; padding:var(--section-gap) 0}
-  .note-sticky{position:static; height:auto; padding:60px 0}
-  .note-floats{display:none}
+  .note-sticky{position:static; height:auto; padding:40px 0}
 }
 
 /* ===== EXPLORE ===== */
@@ -144,7 +410,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    floated over the top of the map so filtering never means leaving the map
    (and stays available in fullscreen) */
 .tabs{position:absolute; z-index:6; top:16px; left:50%; transform:translateX(-50%);
-  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 660px);
+  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 1120px);
   padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:999px;
   box-shadow:0 8px 28px rgba(40,36,30,.22);
   overflow-x:auto; scrollbar-width:none}
@@ -208,6 +474,33 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pin:hover .pill{transform:scale(1.06); box-shadow:0 5px 15px rgba(40,36,30,.3)}
 .pin:active .pill{transform:scale(.96)}
 .pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 0 0 3px var(--pin-color, var(--ink)), 0 7px 20px rgba(40,36,30,.4)}
+/* a favourite keeps its category colour and earns a small star */
+.pin-star{color:var(--pin-color, var(--ink)); font-size:11px; margin-right:5px; vertical-align:1px}
+.pin.active .pin-star{color:#E5C687}
+
+/* ===== the wedding pins — deliberately not a pill =====
+   Everything else on this map is a cream pill in its category colour. The two
+   wedding places are ink plaques edged in gold, sitting above the rest, breathing
+   a slow gold halo. They stay lit while every other pin dims, because on a wedding
+   guide the venue is the one thing you should never have to hunt for. */
+.pin-wedding{z-index:5}
+.pin-wedding .pill{position:relative; background:var(--ink); color:#F6EEDD; border:1.5px solid #C9A76B; border-radius:3px;
+  padding:9px 15px 9px 12px; letter-spacing:.11em; text-transform:uppercase; font-size:10.5px; font-weight:400;
+  box-shadow:0 0 0 1px rgba(201,167,107,.35), 0 6px 18px rgba(40,36,30,.42)}
+.pin-wedding .pill::after{content:""; position:absolute; inset:3px; border:.5px solid rgba(201,167,107,.5); border-radius:1px; pointer-events:none}
+.pin-wedding .pin-rings{display:inline-flex; width:14px; height:14px; margin-right:7px; vertical-align:-3px; color:#D8B87C}
+.pin-wedding .pin-rings svg{width:100%; height:100%; display:block}
+.pin-wedding:hover .pill{transform:scale(1.05); box-shadow:0 0 0 1px rgba(201,167,107,.55), 0 9px 24px rgba(40,36,30,.5)}
+.pin-wedding.active .pill{background:#2B2924; color:#F6EEDD; border-color:#E5C687; transform:scale(1.08);
+  box-shadow:0 0 0 3px rgba(201,167,107,.55), 0 9px 26px rgba(40,36,30,.5)}
+/* the halo: a gold pulse that swells out along the plaque's own outline. Spread on a
+   throwaway ::before rather than on .pill itself, so the pill keeps its own shadow —
+   and its hover and active shadows — untouched. */
+.pin-wedding .pill::before{content:""; position:absolute; inset:0; border-radius:3px; pointer-events:none;
+  animation:weddingHalo 3.4s ease-out infinite}
+@keyframes weddingHalo{0%{box-shadow:0 0 0 0 rgba(201,167,107,.5)} 70%{box-shadow:0 0 0 13px rgba(201,167,107,0)} 100%{box-shadow:0 0 0 0 rgba(201,167,107,0)}}
+/* the venue never dims — that is the whole point of it */
+.pin.pin-wedding.dim{opacity:1}
 
 /* popup — mobile-first, viewport-relative so it always fits and scales with the
    page/orientation automatically (no JS resizing needed) */
@@ -224,6 +517,11 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pop-tip .eyebrow{color:var(--muted)}
 .pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:16.5px; line-height:1.45; margin-top:8px; color:var(--ink)}
 .pop-link{margin-top:18px}
+.pop-fav{display:inline-block; margin-top:9px; font-family:var(--sans); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#A85751}
+/* the wedding detail gets a gold rule under the name — the same gold as its pin */
+.pop-wedding{border-top:2px solid #C9A76B}
+.pop-wedding .eyebrow{color:#7E6437}
+.pop-wedding h3{font-style:italic}
 @media(min-width:760px){
   /* proportional to the window: ~22vw wide and ~36vh tall, clamped — resizing or
      zooming the browser rescales it instead of leaving a fixed oversized box */
@@ -276,6 +574,11 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
 .card .c-more{margin-top:18px}
 .card.active h4{text-decoration:underline; text-underline-offset:5px; text-decoration-thickness:1px}
+.c-fav{color:#A85751; margin-right:7px; font-size:11px; vertical-align:1px}
+/* the wedding cards carry the same gold rule the pins do, so the two read as one thing */
+.card-wedding .c-img{box-shadow:inset 0 0 0 2px #C9A76B}
+.card-wedding .c-cat{color:#7E6437; letter-spacing:.22em}
+.card-wedding h4{font-style:italic}
 
 /* ===== FOOTER / DETAILS ===== */
 .footer{padding:var(--section-gap) 0 90px; text-align:center; border-top:1px solid var(--line)}
@@ -324,6 +627,34 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .rec-error{display:none; margin-top:7px; font-size:12.5px; color:#8C3B2E}
 .rec-field.invalid .rec-error{display:block}
 .rec-field.invalid input,.rec-field.invalid textarea{border-color:#8C3B2E}
+.rec-opt{font-size:10px; letter-spacing:.14em; color:var(--line-2); margin-left:8px}
+
+/* the place field is a combobox: type, and OpenStreetMap answers with real pins */
+.rec-combo{position:relative}
+.rec-suggest{position:absolute; z-index:40; top:calc(100% - 1px); left:0; right:0; margin:0; padding:0; list-style:none;
+  background:var(--white); border:1px solid var(--ink); max-height:264px; overflow-y:auto; box-shadow:0 18px 40px rgba(40,36,30,.16)}
+.rec-suggest li{padding:11px 16px; cursor:pointer; border-top:1px solid var(--line)}
+.rec-suggest li:first-child{border-top:none}
+.rec-suggest li[aria-selected="true"],.rec-suggest li:hover{background:var(--surface-2)}
+.rec-suggest b{display:block; font-family:var(--sans); font-weight:400; font-size:14.5px; color:var(--ink)}
+.rec-suggest small{display:block; margin-top:2px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
+.rec-suggest .rec-searching{color:var(--muted); font-family:var(--sans); font-weight:300; font-size:13px; cursor:default}
+.rec-suggest .rec-searching:hover{background:none}
+
+/* where the pin currently stands, and the way out when OSM has never heard of the place */
+.rec-pin{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-top:9px}
+.rec-pin-state{font-family:var(--sans); font-weight:300; font-size:12.5px; line-height:1.6; color:var(--muted); margin:0}
+.rec-pin-state.set{color:var(--ink-2)}
+.rec-pin-state.set b{font-weight:400}
+.rec-pin-toggle{font-family:var(--sans); font-size:12.5px; font-weight:300; color:var(--ink); background:none; border:none;
+  padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line-2)}
+.rec-pin-toggle:hover{text-decoration-color:var(--ink)}
+.rec-mini{margin-top:12px}
+.rec-mini-map{height:230px; border:1px solid var(--line-2); background:var(--surface-2)}
+.rec-mini-hint{margin-top:8px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
+/* a field only a robot would fill in — off-screen rather than display:none, which
+   the better-written bots know to skip */
+.rec-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
 .rec-submit{display:inline-flex; align-items:center; min-height:48px; padding:14px 30px; cursor:pointer;
   font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
   background:var(--ink); color:var(--surface); border:1px solid var(--ink); transition:background .3s}
@@ -355,151 +686,85 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 </nav>
 
 <header class="hero" id="top">
-  <div class="hero-scene" aria-hidden="true">
-    <svg class="hero-ridge" viewBox="0 0 1440 600" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="mgrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#5c5366"/><stop offset="1" stop-color="#363042"/>
-        </linearGradient>
-        <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
-      </defs>
+  <!-- 0 · the wall -->
+  <div class="wall" aria-hidden="true"></div>
 
-      <!-- far ridge -->
-      <path d="M0,432 C220,402 360,414 520,362 C700,304 820,360 1000,342 C1180,322 1330,360 1440,346 L1440,600 L0,600 Z" fill="#6d6472" opacity=".45"/>
+  <!-- 1 · the curtain. A verlet cloth of Aksara Jawa, woven by the script from
+       the corpus in assets/javanese-script.txt; purely textural, so the real
+       heading below carries the meaning for screen readers. -->
+  <div class="curtain-probe" id="curtain-probe" aria-hidden="true"></div>
+  <canvas class="curtain" id="curtain" aria-hidden="true"></canvas>
 
-      <!-- drifting clouds, behind the mountain -->
-      <g class="cloud-a" fill="#f3ece2" opacity=".14">
-        <path d="M370,152 Q382,124 420,126 Q436,102 478,110 Q518,92 554,116 Q596,110 610,138 Q638,144 626,164 Q604,178 566,172 Q534,186 494,176 Q446,188 412,174 Q378,178 370,152 Z"/>
-        <path d="M402,192 Q480,204 586,190" fill="none" stroke="#f3ece2" stroke-width="6" stroke-linecap="round" opacity=".7"/>
-      </g>
-      <g class="cloud-b" fill="#f3ece2" opacity=".11">
-        <path d="M712,96 Q722,72 756,74 Q772,54 806,62 Q840,48 868,68 Q902,64 912,88 Q932,94 922,110 Q902,122 872,116 Q844,128 810,120 Q772,130 744,118 Q716,122 712,96 Z"/>
-      </g>
+  <!-- 2 · the roof's shadow, falling ON the curtain -->
+  <div class="rshadow rshadow-far" aria-hidden="true"></div>
+  <div class="rshadow rshadow-mid" aria-hidden="true"></div>
+  <div class="rshadow rshadow-near" aria-hidden="true"></div>
+  <div class="rshadow rshadow-contact" aria-hidden="true"></div>
 
-      <!-- Merapi: summit left of centre with the long right shoulder, as in the photo -->
-      <g>
-        <path d="M350,600 C460,470 520,300 552,180 L560,170 L572,176 L584,168
-                 C620,225 650,262 700,288 C770,340 856,462 962,600 Z" fill="url(#mgrad)"/>
-        <path class="plume" d="M548,168 C512,138 462,128 414,140 C452,158 506,166 546,180 Z" fill="#efe3d4" opacity=".12" filter="url(#soft)"/>
-        <g fill="none" stroke="#28232f" stroke-width="2.4" opacity=".5" stroke-linecap="round">
-          <path d="M560,186 C556,262 540,342 512,430"/>
-          <path d="M570,190 C574,268 570,352 556,446"/>
-          <path d="M580,184 C600,250 622,306 664,352"/>
-          <path d="M552,190 C540,252 516,316 482,376"/>
-          <path d="M700,296 C724,346 754,404 792,462"/>
-        </g>
-        <path d="M586,172 C620,226 652,264 702,290 C768,340 850,458 954,592" fill="none" stroke="#e8b183" stroke-width="3" opacity=".3" stroke-linecap="round"/>
-      </g>
+  <!-- 3 · the roof -->
+  <div class="roof" aria-hidden="true"></div>
 
-      <!-- birds -->
-      <g fill="none" stroke="#dccfbe" stroke-width="2.4" stroke-linecap="round" opacity=".55">
-        <path d="M842,232 q9,-10 18,0 q9,-10 18,0"/>
-        <path d="M898,258 q7,-8 14,0 q7,-8 14,0" opacity=".7"/>
-      </g>
-
-      <!-- mid ridge with treeline -->
-      <path d="M0,472 C250,442 400,472 600,452 C820,430 980,476 1200,456 C1330,448 1440,472 1440,472 L1440,600 L0,600 Z" fill="#3e3944"/>
-      <g fill="#332e3c">
-        <ellipse cx="120" cy="454" rx="15" ry="10"/><ellipse cx="140" cy="458" rx="11" ry="8"/><ellipse cx="104" cy="459" rx="9" ry="7"/>
-        <ellipse cx="345" cy="466" rx="17" ry="11"/><ellipse cx="368" cy="470" rx="11" ry="8"/><ellipse cx="326" cy="471" rx="9" ry="7"/>
-        <ellipse cx="700" cy="448" rx="14" ry="9"/><ellipse cx="719" cy="452" rx="9" ry="7"/>
-        <ellipse cx="1052" cy="458" rx="15" ry="10"/><ellipse cx="1072" cy="462" rx="10" ry="7"/><ellipse cx="1036" cy="463" rx="8" ry="6"/>
-      </g>
-
-      <!-- near ridge with treeline and corner foliage -->
-      <path d="M0,522 C220,502 380,542 560,516 C760,488 900,546 1120,520 C1300,500 1440,536 1440,530 L1440,600 L0,600 Z" fill="#2a262e"/>
-      <g fill="#1f1b25">
-        <ellipse cx="242" cy="518" rx="18" ry="11"/><ellipse cx="264" cy="523" rx="13" ry="9"/><ellipse cx="226" cy="525" rx="11" ry="8"/>
-        <ellipse cx="560" cy="514" rx="16" ry="10"/><ellipse cx="581" cy="519" rx="11" ry="8"/>
-        <ellipse cx="884" cy="527" rx="20" ry="12"/><ellipse cx="908" cy="532" rx="13" ry="9"/><ellipse cx="862" cy="533" rx="11" ry="8"/>
-        <ellipse cx="1160" cy="519" rx="17" ry="10"/><ellipse cx="1181" cy="524" rx="11" ry="8"/>
-        <ellipse cx="1358" cy="540" rx="26" ry="15"/><ellipse cx="1408" cy="532" rx="18" ry="12"/><ellipse cx="1432" cy="546" rx="14" ry="10"/>
-      </g>
-    </svg>
-  </div>
-  <div class="hero-photo" aria-hidden="true"></div>
-  <div class="hero-scrim" aria-hidden="true"></div>
-  <!-- blossom branch with a perched bird, in the spirit of the reference painting -->
-  <svg class="hero-flora" viewBox="0 0 360 330" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <g fill="none" stroke="#221d29" stroke-linecap="round">
-      <path d="M366,44 C304,62 252,92 218,132 C188,166 168,206 160,252" stroke-width="6.5"/>
-      <path d="M304,66 C272,60 242,62 218,76" stroke-width="4"/>
-      <path d="M254,94 C230,86 208,88 190,100" stroke-width="3.4"/>
-      <path d="M218,132 C198,122 178,124 162,136" stroke-width="3"/>
-      <path d="M186,168 C170,161 152,165 140,178" stroke-width="2.6"/>
-      <path d="M166,214 C152,208 136,212 126,224" stroke-width="2.2"/>
-    </g>
-    <g fill="#55584a" opacity=".85">
-      <ellipse cx="226" cy="79" rx="7" ry="2.6" transform="rotate(-24 226 79)"/>
-      <ellipse cx="196" cy="103" rx="6.4" ry="2.4" transform="rotate(-18 196 103)"/>
-      <ellipse cx="170" cy="139" rx="6" ry="2.3" transform="rotate(-30 170 139)"/>
-      <ellipse cx="146" cy="181" rx="5.6" ry="2.2" transform="rotate(-16 146 181)"/>
-      <ellipse cx="132" cy="227" rx="5.2" ry="2" transform="rotate(-28 132 227)"/>
-      <ellipse cx="286" cy="72" rx="6.6" ry="2.5" transform="rotate(-12 286 72)"/>
-    </g>
-    <g>
-      <circle cx="212" cy="72" r="5" fill="#c98d97"/><circle cx="212" cy="72" r="1.7" fill="#f0d9c8"/>
-      <circle cx="232" cy="88" r="4.2" fill="#b06d7b"/><circle cx="232" cy="88" r="1.4" fill="#e8cbb9"/>
-      <circle cx="184" cy="96" r="5.4" fill="#c98d97"/><circle cx="184" cy="96" r="1.8" fill="#f0d9c8"/>
-      <circle cx="200" cy="112" r="3.6" fill="#b06d7b"/>
-      <circle cx="160" cy="130" r="5" fill="#c98d97"/><circle cx="160" cy="130" r="1.7" fill="#f0d9c8"/>
-      <circle cx="176" cy="146" r="3.8" fill="#b06d7b"/><circle cx="176" cy="146" r="1.3" fill="#e8cbb9"/>
-      <circle cx="136" cy="172" r="4.8" fill="#c98d97"/><circle cx="136" cy="172" r="1.6" fill="#f0d9c8"/>
-      <circle cx="152" cy="188" r="3.4" fill="#b06d7b"/>
-      <circle cx="122" cy="218" r="4.4" fill="#c98d97"/><circle cx="122" cy="218" r="1.5" fill="#f0d9c8"/>
-      <circle cx="138" cy="234" r="3.2" fill="#b06d7b"/>
-      <circle cx="156" cy="246" r="3.8" fill="#c98d97"/><circle cx="156" cy="246" r="1.3" fill="#f0d9c8"/>
-      <circle cx="262" cy="80" r="4.6" fill="#c98d97"/><circle cx="262" cy="80" r="1.5" fill="#f0d9c8"/>
-      <circle cx="298" cy="60" r="3.8" fill="#b06d7b"/>
-      <circle cx="330" cy="50" r="4.4" fill="#c98d97"/><circle cx="330" cy="50" r="1.5" fill="#f0d9c8"/>
-      <circle cx="246" cy="106" r="2.6" fill="#96586a"/>
-      <circle cx="208" cy="140" r="2.4" fill="#96586a"/>
-      <circle cx="146" cy="206" r="2.3" fill="#96586a"/>
-    </g>
-    <!-- perched bird -->
-    <g transform="translate(238,116) rotate(-6)">
-      <path d="M-18,4 L-40,14 L-34,2 Z" fill="#4f6076"/>
-      <ellipse cx="0" cy="0" rx="17" ry="9.5" fill="#6d8299"/>
-      <circle cx="14" cy="-8" r="7" fill="#6d8299"/>
-      <path d="M20,-8 l9,2.4 -9,2.4 Z" fill="#3f4c5c"/>
-      <circle cx="16.5" cy="-9.5" r="1.4" fill="#f1ede6"/>
-      <path d="M-4,-2 C2,-6 8,-6 12,-2 C8,2 2,3 -4,-2 Z" fill="#5c718a"/>
-    </g>
-    <!-- falling petals -->
-    <g fill="#c98d97" opacity=".55">
-      <ellipse cx="196" cy="278" rx="3.4" ry="1.8" transform="rotate(24 196 278)"/>
-      <ellipse cx="238" cy="252" rx="3" ry="1.6" transform="rotate(-30 238 252)"/>
-      <ellipse cx="170" cy="304" rx="2.8" ry="1.5" transform="rotate(12 170 304)"/>
-    </g>
-  </svg>
+  <!-- 4 · UI -->
+  <div class="hero-veil" aria-hidden="true"></div>
   <div class="hero-content wrap">
     <span class="eyebrow">A guide for our guests</span>
     <h1 class="hero-title">Our <em>Yogyakarta</em></h1>
     <p class="hero-lede">The coffee we start our mornings with, the bars we end our evenings in, and the tables we would cross the city for — gathered here for you.</p>
-    <a class="hero-link link-u" href="#explore">Explore the guide <span>&rarr;</span></a>
+    <div class="hero-foot">
+      <a class="hero-link link-u" href="#explore">Explore the guide <span>&rarr;</span></a>
+      <div class="hero-utils">
+        <button class="mute" id="mute" type="button" aria-pressed="false">
+          <span class="mute-i" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="mute-t">Chime on</span>
+        </button>
+        <a class="scrollcue" href="#note" aria-label="Scroll down">&darr;</a>
+      </div>
+    </div>
   </div>
-  <a class="scrollcue" href="#note" aria-label="Scroll down">&darr;</a>
 </header>
 
 <section class="note" id="note">
   <div class="note-sticky">
-    <div class="note-floats" aria-hidden="true">
-      <figure class="gfloat front"        data-depth="1.3"  data-z="90"   data-dx="-30" style="--x:12%; --y:6%;  --w:250px; --rot:-4deg"><img src="assets/places/merapi-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mount Merapi</figcaption></figure>
-      <figure class="gfloat"              data-depth="0.9"  data-z="-140" data-dx="24"  style="--x:74%; --y:10%; --w:220px; --rot:3deg"><img src="assets/places/sate-klathak-pak-bari-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Sate Klathak Pak Bari</figcaption></figure>
-      <figure class="gfloat front"        data-depth="1.6"  data-z="140"  data-dx="-40" style="--x:3%;  --y:38%; --w:190px; --rot:-6deg"><img src="assets/places/warung-bu-kadek-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Warung Bu Kadek</figcaption></figure>
-      <figure class="gfloat"              data-depth="1.1"  data-z="-60"  data-dx="36"  style="--x:80%; --y:42%; --w:200px; --rot:5deg"><img src="assets/places/djaya-roasters-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Djaya Roasters</figcaption></figure>
-      <figure class="gfloat hide-m"       data-depth="0.7"  data-z="-220" data-dx="-18" style="--x:12%; --y:66%; --w:180px; --rot:4deg"><img src="assets/places/suara-dewandaru-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Suara Dewandaru</figcaption></figure>
-      <figure class="gfloat hide-m"       data-depth="1.2"  data-z="30"   data-dx="22"  style="--x:60%; --y:2%;  --w:150px; --rot:-3deg"><img src="assets/places/tusen-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>TUSEN</figcaption></figure>
-      <figure class="gfloat front"        data-depth="1.45" data-z="110"  data-dx="30"  style="--x:56%; --y:70%; --w:190px; --rot:-5deg"><img src="assets/places/bubur-yoyong-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Bubur Yoyong</figcaption></figure>
-      <figure class="gfloat"              data-depth="1.0"  data-z="-30"  data-dx="-26" style="--x:78%; --y:74%; --w:230px; --rot:2deg"><img src="assets/places/kopi-bukan-luwak-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Kopi Bukan Luwak</figcaption></figure>
-      <figure class="gfloat hide-m"       data-depth="0.8"  data-z="-180" data-dx="14"  style="--x:38%; --y:3%;  --w:160px; --rot:6deg"><img src="assets/places/mie-sapi-banteng-sm.jpg" alt="" loading="lazy" decoding="async"><figcaption>Mie Sapi Banteng</figcaption></figure>
-    </div>
+    <div class="note-strip" data-dir="-1" aria-hidden="true"><div class="strip-track">
+      <figure class="gcard"><img src="assets/places/merapi-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Mount Merapi</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/couvee-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Couvee</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/sate-klathak-pak-pong-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Sate Klathak</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/tusen-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>TUSEN</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/estuary-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Estuary Café</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/bubur-yoyong-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Bubur Yoyong</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/djaya-roasters-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Djaya Roasters</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/cheri-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Chéri</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/machia-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Machia</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/gudeg-bromo-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Gudeg Bromo</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/fifth-note-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Fifth Note</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/ayam-geprek-bu-made-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Ayam Geprek Bu Made</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/bloomery-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Bloomery</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/sate-babi-koh-ben-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Sate Babi Koh Ben</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/komitokoro-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>KomiTokoro</figcaption></figure>
+    </div></div>
     <div class="wrap note-quote reveal">
       <div class="rule"></div>
       <span class="eyebrow">From us, to you</span>
       <p>“Jogja is small enough to wander on foot and warm enough to feel like home by the second day. Choose a craving, and let the map lead the way.”</p>
       <div class="sign eyebrow">Hilga &amp; Lucas</div>
     </div>
+
+    <div class="note-strip" data-dir="1" aria-hidden="true"><div class="strip-track">
+      <figure class="gcard"><img src="assets/places/kopi-bukan-luwak-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Kopi Bukan Luwak</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/mediterranea-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Mediterranea</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/warung-bu-kadek-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Warung Bu Kadek</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/mie-sapi-banteng-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Mie Sapi Banteng</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/suara-dewandaru-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Suara Dewandaru</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/tio-ciu-bang-sinyo-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Tio Ciu</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/space-roastery-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Space Roastery</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/sakapatat-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Sakapatat</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/golden-geisha-ramen-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Golden Geisha</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/tip-tap-toe-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>TIP TAP TOE</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/bakmi-jawa-mas-timbul-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Bakmi Mas Timbul</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/michael-kreme-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Michael Kreme</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/masama-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Masama</figcaption></figure>
+      <figure class="gcard"><img src="assets/places/sate-klathak-pak-bari-sm.jpg" alt="" loading="lazy" decoding="async" width="400" height="500"><figcaption>Sate Pak Bari</figcaption></figure>
+    </div></div>
   </div>
 </section>
 
@@ -508,7 +773,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot.</p>
+      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot. The two gold plaques are the wedding itself; they stay on the map whatever you are browsing.</p>
     </div>
 
   </div>
@@ -551,13 +816,35 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
         </div>
         <div class="rec-field" id="f-place">
           <label for="rec-place">The place</label>
-          <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…" />
+          <div class="rec-combo">
+            <input id="rec-place" name="place" type="text" placeholder="A warung, a cafe, a bar…"
+                   role="combobox" aria-expanded="false" aria-controls="rec-suggest"
+                   aria-autocomplete="list" aria-describedby="rec-pin-state" autocomplete="off" />
+            <ul class="rec-suggest" id="rec-suggest" role="listbox" aria-label="Matching places" hidden></ul>
+          </div>
           <p class="rec-error">What's the place called?</p>
+          <div class="rec-pin">
+            <p class="rec-pin-state" id="rec-pin-state">Type a few letters and pick it from the list, so it lands on the right corner.</p>
+            <button type="button" class="rec-pin-toggle" id="rec-pin-toggle" aria-expanded="false" aria-controls="rec-mini">Place the pin myself</button>
+          </div>
+          <div class="rec-mini" id="rec-mini" hidden>
+            <div class="rec-mini-map" id="rec-mini-map"></div>
+            <p class="rec-mini-hint">Tap anywhere to move the pin — or drag it. Zoom in to be exact.</p>
+          </div>
         </div>
         <div class="rec-field" id="f-why">
           <label for="rec-why">Why do we need to try it?</label>
           <textarea id="rec-why" name="why" rows="4" placeholder="What should we order? What makes it special?"></textarea>
           <p class="rec-error">Give us a line on why it's worth the trip.</p>
+        </div>
+        <div class="rec-field" id="f-link">
+          <label for="rec-link">Google Maps link <span class="rec-opt">OPTIONAL</span></label>
+          <input id="rec-link" name="link" type="url" inputmode="url" autocomplete="off"
+                 placeholder="Paste one and the directions button goes straight there" />
+        </div>
+        <div class="rec-hp" aria-hidden="true">
+          <label for="rec-web">Leave this field empty</label>
+          <input id="rec-web" name="website" type="text" tabindex="-1" autocomplete="off" />
         </div>
         <button type="submit" class="rec-submit">Add your recommendation</button>
         <p class="rec-status" id="rec-status" aria-live="polite"></p>
@@ -599,44 +886,778 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 <script>
 /* ============================================================
    EDIT HERE — names in the nav/note/footer markup above; date in
-   the footer. A real hero photo: set --hero-img in :root to
-   url('your-photo.jpg'). Each place: category + coords [lat,lng].
+   the footer. The hero is assets/joglo-roof-eave.png (desktop) and
+   assets/joglo-roof-eave-820.png (phones), both trimmed so the
+   image's bottom edge IS the eave line — the shadow hinges there,
+   so re-crop rather than pad if you swap the roof. The curtain
+   reads assets/javanese-script.txt. Composition constants are in
+   CURTAIN_TUNE below; the light is aimed from --sun-azimuth /
+   --sun-elevation in :root. Each place: category + coords [lat,lng].
    Add  img:"https://…"  to any place to show a real photo on cards.
    ============================================================ */
+
+/* ---- the shared shelf for friends' tips ----------------------------------
+   Paste the /exec URL of the Apps Script deployment here and a guest's
+   recommendation is written to your Google Sheet and read back onto every
+   other guest's map, on whatever device they're holding. Take a row down by
+   typing "y" in its Hidden column. apps-script/README.md walks through the
+   five minutes of setup.
+
+   LEAVE THIS EMPTY AND NOTHING IS SHARED: tips stay in the browser that wrote
+   them — a phone and a laptop are two different islands — and reach you only
+   by the email link. That is the fallback, not the feature. ---------------- */
+const REC_ENDPOINT = '';
+
+/* guest identity + their recommendations, remembered on this device */
+const store = {
+  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
+  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
+  get name(){ return this.read('oy_name',''); },
+  set name(v){ this.write('oy_name', v); },
+  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
+  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
+  get muted(){ return this.read('oy_mute','')==='1'; },
+  set muted(v){ this.write('oy_mute', v?'1':''); },
+  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
+  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
+};
+
+let CHIME = null;
+
+/* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain
+/* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain of
+/* ---- The doorway. A joglo roof hangs at the top of the frame, and beneath it an
+   interactive string cloth of Aksara Jawa: a grid of glyphs, the top row pinned
+   so the rest hangs off it, brushed and dragged by the pointer.
+
+   This is Liam Egan's "Strings" (codepen.io/shubniggurath/pen/ZYpjorm) with its
+   own numbers: gravity 0.2 and damping 0.99 per frame, five constraint passes,
+   vertical links that may close to 2% of rest and open to 110%, sideways links
+   far slacker at 60% and 400% — that slack is why the hem separates into strands
+   while the pinned top stays a sheet. The pointer both brushes (a radial shove
+   falling off over ~70px) and drags (grabs the nearest glyph within 20px and
+   carries it).
+
+   The pen folds gravity in as gravity/delta² and then multiplies through by
+   delta² again, so gravity is really a fixed step per frame and only the pointer
+   force scales with the timestep. Kept as written, on a fixed 60Hz step, so it
+   behaves the same when the frame rate does not.
+
+   Two helpers the pen imports (getPointID, smoothstep) are a grid index and the
+   standard smoothstep, reimplemented here. ---- */
+const CURTAIN_TUNE = {
+  /* ---- the grid ---- */
+  cols:32,               /* glyph columns across the doorway */
+  colsMobile:18,
+  glyph:.9,              /* font size as a multiple of the row spacing */
+  ink:1,                 /* one opacity for every glyph — solid, not ghosted */
+  keepFeather:150,       /* px over which the script fades out around the copy — wide
+                            enough that it thins toward the type rather than cutting an arc */
+  keepFeatherNarrow:88,  /* Below 900px the copy sits UNDER the doorway instead of beside
+                            it, so the feather is subtracted from the cloth's own height
+                            rather than from clear wall to its side. At 150 it reached
+                            within 47px of the eave on a 390px phone — the whole hem was
+                            inside the ramp, which is what made the strands look sliced
+                            off rather than hung. Narrower here so the fade reads as a
+                            hem just above the type; the veil wash does the rest. */
+
+  /* ---- the cloth, exactly as the pen has it ---- */
+  gravity:.2,
+  damping:.99,
+  iterations:5,
+  compress:.02,          /* a vertical link may close to this share of its rest length… */
+  stretch:1.1,           /* …and open to this */
+  spacerCompress:.6,     /* the sideways links are far slacker, which is what lets the */
+  spacerStretch:4,       /*   hem separate into strands while the top stays a sheet */
+
+  /* ---- the pointer ---- */
+  mouseSize:5000,        /* brush reach, as distance SQUARED — about 70px */
+  mouseStrength:4,
+  grabRadius:20,         /* drag: how near you must be to catch a glyph */
+  drift:.55              /* degrees the sun's angle wanders, on a very slow sine */
+};
+
+(function curtain(){
+  const hero = document.querySelector('.hero');
+  const cv = document.getElementById('curtain');
+  const probe = document.getElementById('curtain-probe');
+  if(!hero || !cv || !probe) return;
+
+  const T = CURTAIN_TUNE;
+  const ctx = cv.getContext('2d');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const DT = 1000 / 60, DD = DT * DT;      /* the pen's delta², held fixed */
+  const smoothstep = (a, b, x)=>{ const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+  /* Javanese stacks vowel signs and pangkon onto its consonants, so the grid has
+     to carry whole grapheme clusters — splitting on code points strands the marks. */
+  function toClusters(s){
+    if(typeof Intl !== 'undefined' && Intl.Segmenter){
+      try{ return Array.from(new Intl.Segmenter('jv', {granularity:'grapheme'}).segment(s), x => x.segment); }
+      catch(e){}
+    }
+    try{ return s.match(/\P{M}\p{M}*|\p{M}+/gu) || []; }
+    catch(e){ return Array.from(s); }
+  }
+
+  let clusters = [];
+  let P = [], links = [], cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, clothW = 0;
+  let originX = 0, originY = 0, clothBottom = 0;   /* where the weave sits inside the canvas */
+  let atlas = null, boxPx = 0, fade = null, keep = null, keepFeather = 0;
+  const FADE_N = 96;                     /* resolution of the vertical fade ramp */
+  let raf = 0, acc = 0, last = 0, t0 = 0, ticks = 0, calm = 0;
+  let onScreen = true, visible = true;
+  const mouse = { x:0, y:0, in:false };
+  let grabbed = null;
+
+  /* Every distinct cluster is rasterised once at device resolution and stamped
+     from there — laying out text per glyph per frame would cost far more than
+     the cloth does. */
+  function buildAtlas(){
+    boxPx = Math.ceil(fontPx * 1.6);
+    const root = getComputedStyle(document.documentElement);
+    const fam = root.getPropertyValue('--javanese').trim() || 'serif';
+    const ink = root.getPropertyValue('--script-ink').trim() || '#7B6F5C';
+    atlas = new Map();
+    for(const ch of new Set(clusters)){
+      const off = document.createElement('canvas');
+      off.width = off.height = Math.ceil(boxPx * dpr);
+      const o = off.getContext('2d');
+      o.scale(dpr, dpr);
+      o.font = '400 ' + fontPx + 'px ' + fam;
+      o.textAlign = 'center'; o.textBaseline = 'middle';
+      o.fillStyle = ink;
+      o.fillText(ch, boxPx / 2, boxPx / 2);
+      atlas.set(ch, off);
+    }
+  }
+
+  function build(){
+    if(!clusters.length) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if(!w || !h) return;
+
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+
+    /* The weave's geometry comes from the hidden probe, which CSS lays out from the
+       same tokens as the roof. */
+    const pr = probe.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+    clothW = Math.max(40, pr.width);
+    const eaveY = pr.top - cr.top;            /* the flat eave line, in canvas coords */
+    let clothH = Math.max(60, pr.height);
+    originX = (w - clothW) / 2;
+
+    cols = matchMedia('(max-width:760px)').matches ? T.colsMobile : T.cols;
+    /* 900px, not 760px: this tracks the layout breakpoint where the copy moves under
+       the doorway, which is what changes what the feather is eating into. */
+    keepFeather = matchMedia('(max-width:900px)').matches ? T.keepFeatherNarrow : T.keepFeather;
+    cellW = clothW / (cols - 1);
+    rows = Math.max(6, Math.round(clothH / cellW) + 1);
+    cellH = clothH / (rows - 1);
+    fontPx = Math.max(8, Math.round(cellH * T.glyph));
+    buildAtlas();
+
+    /* The script pours out from UNDER the eave: the first row is dropped by half a
+       glyph so the top of its ink sits on that line and nothing is drawn above it,
+       rather than the weave starting behind the roof and draping through it. */
+    originY = eaveY + boxPx / 2;
+    clothH -= boxPx / 2;
+    cellH = clothH / (rows - 1);
+
+    /* Densest where it spills from under the eaves, then away to nothing down the
+       frame — so it never blankets the viewport at one flat density, and whatever
+       survives behind the headline and paragraph is far below noticing.
+       Carried in each glyph's own alpha, from this small ramp. Doing it as a CSS
+       mask made the compositor re-mask an every-frame canvas (7.4ms at p99), and
+       as a full-canvas gradient erase it still cost a screen-sized fill per frame
+       (6.0ms); folded into the draw it is a table lookup. */
+    clothBottom = originY + clothH;
+    fade = new Float32Array(FADE_N);
+    for(let i = 0; i < FADE_N; i++){
+      const u = i / (FADE_N - 1);
+      /* only the tail of the throw fades now — the copy is protected by the
+         keep-out region below rather than by flattening the whole layer */
+      fade[i] = T.ink * (u < .72 ? 1 : Math.max(0, 1 - (u - .72) / .28));
+    }
+
+    /* The keep-out is the box the reading copy occupies, not a band across the
+       frame. A vertical ramp cannot both let the script go dark and clear the
+       headline, because on wide screens the headline sits in the MIDDLE of the
+       weave's vertical span — it only misses it horizontally. Measured off the
+       live elements so it follows the type at any width. */
+    keep = null;
+    const parts = ['.hero-content .eyebrow', '.hero-title', '.hero-lede'];
+    for(const sel of parts){
+      const el = document.querySelector(sel);
+      if(!el) continue;
+      const r = el.getBoundingClientRect();
+      if(!r.width || !r.height) continue;
+      const x0 = r.left - cr.left, y0 = r.top - cr.top, x1 = r.right - cr.left, y1 = r.bottom - cr.top;
+      keep = keep ? { x0:Math.min(keep.x0,x0), y0:Math.min(keep.y0,y0),
+                      x1:Math.max(keep.x1,x1), y1:Math.max(keep.y1,y1) }
+                  : { x0, y0, x1, y1 };
+    }
+
+    P = []; links = [];
+    calm = 0;
+    let ci = 0;
+    for(let i = 0; i < cols; i++){
+      for(let j = 0; j < rows; j++){
+        const x = originX + i * cellW, y = originY + j * cellH;
+        P.push({ x, y, ox:x, oy:y, ax:0, ay:0, pinned: j === 0,
+                 ch: clusters[ci++ % clusters.length], down:null });
+      }
+    }
+    const id = (i, j)=> i * rows + j;
+    for(let i = 0; i < cols; i++){
+      for(let j = 0; j < rows; j++){
+        const p = P[id(i, j)];
+        if(j < rows - 1){
+          const l = { a:p, b:P[id(i, j+1)], len:cellH,
+                      min:cellH * T.compress, max:cellH * T.stretch };
+          links.push(l); p.down = l;
+        }
+        if(i < cols - 1){
+          links.push({ a:p, b:P[id(i+1, j)], len:cellW,
+                       min:cellW * T.spacerCompress, max:cellW * T.spacerStretch });
+        }
+      }
+    }
+    render();
+  }
+
+  function step(){
+    const g = T.gravity, d = T.damping;
+    let moved = 0;
+    for(let k = 0; k < P.length; k++){
+      const p = P[k];
+      if(p.pinned){ p.ax = p.ay = 0; continue; }
+      const vx = (p.x - p.ox) * d, vy = (p.y - p.oy) * d;
+      const m = Math.abs(vx) + Math.abs(vy); if(m > moved) moved = m;
+      p.ox = p.x; p.oy = p.y;
+      /* gravity is a flat step per frame; only the pointer force carries delta² */
+      p.x += vx + p.ax * DD;
+      p.y += vy + g + p.ay * DD;
+      p.ax = p.ay = 0;
+    }
+    /* The pen's cloth has no wind: once it has hung itself it is genuinely
+       still, and simulating a motionless sheet every frame is pure waste. Park
+       the physics when nothing is moving; the pointer wakes it instantly, and
+       the loop keeps turning for the shadow's drift, which costs one style
+       write every fourth frame. */
+    calm = moved < .01 ? calm + 1 : 0;
+    for(let it = 0; it < T.iterations; it++){
+      for(let k = 0; k < links.length; k++){
+        const l = links[k], p1 = l.a, p2 = l.b;
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy);
+        if(dist === 0) continue;
+        let target = l.len;
+        if(dist < l.min) target = l.min;
+        else if(dist > l.max) target = l.max;
+        else continue;
+        const pct = (target - dist) / dist / 2;
+        const ox = dx * pct, oy = dy * pct;
+        if(!p1.pinned){ p1.x -= ox; p1.y -= oy; }
+        if(!p2.pinned){ p2.x += ox; p2.y += oy; }
+      }
+    }
+  }
+
+  function render(){
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    const half = boxPx / 2;
+    const fs = (FADE_N - 1) / Math.max(1, clothBottom - originY);
+    let alpha = -1;
+    for(let k = 0; k < P.length; k++){
+      const p = P[k];
+      const img = atlas.get(p.ch);
+      if(!img) continue;
+      let i = ((p.y - originY) * fs) | 0;
+      if(i < 0) i = 0; else if(i >= FADE_N) i = FADE_N - 1;
+      let a = fade[i];
+      if(keep){
+        /* distance outside the copy's box, smoothed — 0 inside it, full well clear of it */
+        const dx = Math.max(keep.x0 - p.x, 0, p.x - keep.x1);
+        const dy = Math.max(keep.y0 - p.y, 0, p.y - keep.y1);
+        const d = Math.min(1, Math.sqrt(dx * dx + dy * dy) / keepFeather);
+        a *= d * d * (3 - 2 * d);
+      }
+      if(a < .004) continue;
+      if(a !== alpha){ ctx.globalAlpha = alpha = a; }
+      let cos = 1, sin = 0;
+      if(p.down){
+        const ang = Math.atan2(p.down.b.y - p.y, p.down.b.x - p.x) - Math.PI / 2;
+        cos = Math.cos(ang); sin = Math.sin(ang);
+      }
+      ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * p.x, dpr * p.y);
+      ctx.drawImage(img, -half, -half, boxPx, boxPx);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
+  function frame(now){
+    raf = 0;
+    if(!visible || !P.length) return;
+    acc += Math.min(200, now - last);
+    last = now;
+    let n = 0;
+    while(acc >= DT && n < 4){ if(calm > 24){ acc = 0; break; } step(); acc -= DT; n++; }
+    if(n) render();
+
+    /* the sun wanders a fraction of a degree; written on .hero every fourth frame
+       and inherited by all four shadow layers, which keeps the recalc off the
+       hot path */
+    if((ticks++ & 3) === 0){
+      const t = (now - t0) / 1000;
+      hero.style.setProperty('--shadow-drift',
+        (Math.sin(t * .085) * T.drift + Math.sin(t * .031) * T.drift * .45).toFixed(3) + 'deg');
+    }
+    raf = requestAnimationFrame(frame);
+  }
+  function wake(){
+    if(still || raf || !visible || !P.length) return;
+    last = performance.now();
+    if(!t0) t0 = last;
+    acc = 0;
+    raf = requestAnimationFrame(frame);
+  }
+  function sleep(){ if(raf){ cancelAnimationFrame(raf); raf = 0; } }
+  function settleOrRun(){
+    /* with reduced motion the cloth is dropped into place once and then held, so
+       the hero is still a finished composition rather than a rigid lattice */
+    if(still){ for(let i = 0; i < 240; i++) step(); render(); }
+    else wake();
+  }
+
+  /* ---- brush and drag ---- */
+  function at(e){
+    const r = cv.getBoundingClientRect();     /* read here, never inside frame() */
+    mouse.x = e.clientX - r.left;
+    mouse.y = e.clientY - r.top;
+    mouse.in = true;
+  }
+  /* Returns whether the brush actually reached the cloth. The chime hangs off
+     that rather than off the pointer being somewhere in the hero: the sound
+     should come from touching the weave, not from passing near it. */
+  function brush(){
+    const R2 = T.mouseSize;
+    let touched = false;
+    for(let k = 0; k < P.length; k++){
+      const p = P[k];
+      if(p.pinned) continue;
+      const dx = mouse.x - p.x, dy = mouse.y - p.y;
+      const ls = dx * dx + dy * dy;
+      if(ls >= R2) continue;
+      const a = Math.atan2(dy, dx) - Math.PI;         /* away from the pointer */
+      const s = smoothstep(R2, -2000, ls) * T.mouseStrength / 300;
+      p.ax += Math.cos(a) * s;
+      p.ay += Math.sin(a) * s;
+      touched = true;
+    }
+    return touched;
+  }
+  function down(e){
+    if(still) return;
+    at(e);
+    for(let k = 0; k < P.length; k++){
+      const p = P[k];
+      const dx = mouse.x - p.x, dy = mouse.y - p.y;
+      if(dx * dx + dy * dy < T.grabRadius * T.grabRadius){
+        grabbed = p; grabbed.wasPinned = p.pinned; p.pinned = true; break;
+      }
+    }
+  }
+  function up(){
+    if(grabbed){ grabbed.pinned = grabbed.wasPinned; grabbed = null; }
+  }
+  function move(e){
+    if(still || !P.length) return;
+    if(e.clientY > hero.getBoundingClientRect().bottom){ mouse.in = false; return; }
+    at(e);
+    if(grabbed){ grabbed.x = mouse.x; grabbed.y = mouse.y; grabbed.ox = mouse.x; grabbed.oy = mouse.y; }
+    const touched = brush();
+    if(touched || grabbed){
+      calm = 0;
+      wake();
+      if(CHIME) CHIME.brush(Math.min(1, Math.max(0, (mouse.x - originX) / clothW)), mouse.x);
+    } else if(CHIME) CHIME.rest();
+  }
+
+  addEventListener('pointermove', e=>{ if(e.pointerType !== 'touch') move(e); }, {passive:true});
+  addEventListener('pointerdown', e=>{ if(e.pointerType !== 'touch') down(e); }, {passive:true});
+  addEventListener('pointerup', up, {passive:true});
+  hero.addEventListener('touchstart', e=>{ const t = e.touches[0]; if(t) down(t); }, {passive:true});
+  hero.addEventListener('touchmove', e=>{ const t = e.touches[0]; if(t) move(t); }, {passive:true});
+  hero.addEventListener('touchend', ()=>{ up(); mouse.in = false; if(CHIME) CHIME.rest(); }, {passive:true});
+
+  document.addEventListener('visibilitychange', ()=>{
+    visible = onScreen && !document.hidden;
+    visible ? wake() : sleep();
+  });
+  const io = new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      onScreen = e.isIntersecting;
+      visible = onScreen && !document.hidden;
+      visible ? wake() : sleep();
+    });
+  }, {threshold:0});
+  io.observe(hero);
+
+  /* Rebuild on resize only when the box actually changed — mobile browsers fire
+     resize as the URL bar slides away, and reweaving for that would be both
+     wasteful and visible. */
+  let lastW = 0, lastH = 0, rt;
+  function onResize(){
+    clearTimeout(rt);
+    rt = setTimeout(()=>{
+      const w = cv.clientWidth, h = cv.clientHeight;
+      if(Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 40) return;
+      lastW = w; lastH = h; build(); settleOrRun();
+    }, 180);
+  }
+  addEventListener('resize', onResize, {passive:true});
+  addEventListener('orientationchange', onResize, {passive:true});
+  addEventListener('pagehide', ()=>{ sleep(); io.disconnect(); }, {once:true});
+
+  fetch('assets/javanese-script.txt')
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(text => {
+      /* drop the machine-translation credit on the last line, and the zero-width
+         spaces scattered through the letter */
+      const lines = text.split('\n').filter(l => l.trim());
+      const body = lines.slice(0, -1).join(' ').replace(/​/g, '');
+      clusters = toClusters(body).filter(c => c.trim());
+      lastW = cv.clientWidth; lastH = cv.clientHeight;
+      build();
+      settleOrRun();
+    })
+    .catch(()=>{ /* no corpus: the roof, wall and shadow still compose on their own */ });
+})();
+/* ---- The wind chime. Synthesised, no files: each voice is a short filtered
+   noise burst for the strike, plus four inharmonic partials at struck-bar
+   ratios, each decaying at its own rate so the highs die away first and the
+   fundamental rings on underneath. Nothing is created until you touch the
+   page — the context is built on the first gesture and never before. ---- */
+const CHIME_TUNE = {
+  /* ---- tuning ---- */
+  root:466,              /* Hz — the fundamental of the leftmost strand */
+  octaves:2,             /* how far the scale climbs across the curtain */
+  slendro:[0,231,474,717,955],   /* cents. Sléndro's five steps are near-equal but
+                                    NOT equal, and that irregularity is the whole
+                                    character — spacing them evenly would just be
+                                    5-tone equal temperament, which sounds synthetic
+                                    and belongs to no gamelan. */
+  partials:[1,2.76,5.40,8.93],   /* struck-bar ratios: inharmonic, so it reads as metal rather than a flute */
+  decays:[4.2,1.5,.8,.42],       /* s, per partial — highs die first. The ramp reaches
+                                    -80dB at these times, so the fundamental stays audible
+                                    for roughly 2.5-3s, which is the ring the brief asks for */
+
+  /* ---- when it rings ----
+     One note per movement. A gesture is a run of pointer travel: the first
+     movement after a pause sounds once, and a continued sweep only sounds again
+     after `stride` more pixels, so brushing the curtain gives you a note rather
+     than a stream. Reading the cloth's own motion instead put a note on every
+     ripple, which is far too many for a hand that moved once. */
+  restMs:140,            /* ms of stillness that ends a brush and re-arms the first note */
+  stride:170,            /* px of continuous travel before a sustained brush sounds again */
+  voices:6,              /* concurrent cap; the quietest gets stolen */
+
+  /* ---- the bus ---- */
+  strike:.014,           /* length of the noise transient, s */
+  reverbMix:.26,
+  masterGain:.5
+};
+
+(function chime(){
+  const btn = document.getElementById('mute');
+  if(!btn) return;
+
+  const C = CHIME_TUNE;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let ctx = null, bus = null, master = null, noise = null;
+  let voices = [];
+  /* With reduced motion the curtain never moves, so nothing would ring anyway —
+     but the toggle should also READ as off, and stay off, until asked otherwise. */
+  let muted = store.read('oy_mute', null) === null
+    ? matchMedia('(prefers-reduced-motion: reduce)').matches
+    : store.muted;
+  let lastMove = 0, lastX = 0, travel = 0;   /* gesture tracking */
+
+  /* one frequency per scale degree, climbing left to right across the opening */
+  const steps = C.slendro.length * C.octaves;
+  const pitches = [];
+  for(let i = 0; i < steps; i++){
+    const cents = C.slendro[i % C.slendro.length] + 1200 * Math.floor(i / C.slendro.length);
+    pitches.push(C.root * Math.pow(2, cents / 1200));
+  }
+
+  function paint(){
+    btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    btn.querySelector('.mute-t').textContent = muted ? 'Chime off' : 'Chime on';
+    btn.classList.toggle('off', muted);
+  }
+  paint();
+
+  /* a short, dark room: noise decaying exponentially, so the chime sits in a
+     space instead of arriving dry on top of the page */
+  function makeIR(secs){
+    const n = Math.floor(ctx.sampleRate * secs);
+    const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+    for(let c = 0; c < 2; c++){
+      const d = buf.getChannelData(c);
+      for(let i = 0; i < n; i++){
+        const t = i / n;
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (1 - t * .2);
+      }
+    }
+    return buf;
+  }
+
+  function boot(){
+    if(ctx || !AC) return;
+    ctx = new AC();
+
+    bus = ctx.createGain(); bus.gain.value = 1;
+
+    const conv = ctx.createConvolver(); conv.buffer = makeIR(1.5);
+    const wet = ctx.createGain(); wet.gain.value = C.reverbMix;
+    const dry = ctx.createGain(); dry.gain.value = 1 - C.reverbMix;
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 14; comp.ratio.value = 3;
+    comp.attack.value = .006; comp.release.value = .25;
+
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : C.masterGain;
+
+    /* voices → reverb → compressor → master */
+    bus.connect(dry).connect(comp);
+    bus.connect(conv).connect(wet).connect(comp);
+    comp.connect(master).connect(ctx.destination);
+
+    /* one second of noise, reused by every strike */
+    const n = Math.floor(ctx.sampleRate * .25);
+    noise = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = noise.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+
+  /* free the quietest voice when we are at the cap: whatever has decayed
+     furthest is the one nobody will miss */
+  function steal(now){
+    let worst = -1, worstLeft = Infinity;
+    for(let i = 0; i < voices.length; i++){
+      const v = voices[i];
+      const left = v.amp * Math.max(0, 1 - (now - v.at) / C.decays[0]);
+      if(left < worstLeft){ worstLeft = left; worst = i; }
+    }
+    if(worst < 0) return;
+    const v = voices[worst];
+    try{
+      v.g.gain.cancelScheduledValues(now);
+      v.g.gain.setValueAtTime(Math.max(1e-4, v.g.gain.value), now);
+      v.g.gain.exponentialRampToValueAtTime(1e-4, now + .06);
+      v.oscs.forEach(o => { try{ o.stop(now + .07); }catch(e){} });
+    }catch(e){}
+    voices.splice(worst, 1);
+  }
+
+  /* Called on every pointer move. Decides whether this movement has earned a
+     note; the synthesis below only runs when it has. */
+  /* Called straight off every pointer move, and played the instant it fires —
+     nothing is queued or scheduled ahead, so the note lands with the brush. */
+  function brush(pos, px){
+    if(muted || !ctx || ctx.state !== 'running') return;
+    const t = performance.now();
+    let fire = false;
+    if(t - lastMove > C.restMs){ travel = 0; fire = true; }   /* a fresh brush */
+    else {
+      travel += Math.abs(px - lastX);
+      if(travel >= C.stride){ travel = 0; fire = true; }      /* still brushing */
+    }
+    lastMove = t; lastX = px;
+    if(fire) strike(pos);
+  }
+  function rest(){ lastMove = 0; travel = 0; }
+
+  /* `pos` is where along the curtain the movement was, 0 to 1 — so the note you
+     hear belongs to the part of the cloth you just disturbed. */
+  function strike(pos){
+    if(muted || !ctx || ctx.state !== 'running') return;
+    const now = ctx.currentTime;
+    const at = now;
+    if(voices.length >= C.voices) steal(now);
+
+    const amp = .55;
+    const freq = pitches[Math.min(pitches.length - 1, Math.max(0, Math.floor(pos * pitches.length)))];
+
+    const g = ctx.createGain();
+    g.gain.value = 1;
+    g.connect(bus);
+
+    const src = ctx.createBufferSource(); src.buffer = noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = Math.min(12000, freq * (3.5 + amp * 5));
+    bp.Q.value = 1.1;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(.42 * amp, at);
+    ng.gain.exponentialRampToValueAtTime(1e-4, at + C.strike);
+    src.connect(bp).connect(ng).connect(g);
+    src.start(at); src.stop(at + C.strike + .02);
+
+    const oscs = [];
+    for(let i = 0; i < C.partials.length; i++){
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq * C.partials[i];
+      const og = ctx.createGain();
+      const peak = Math.max(1e-4, amp * .42 / (1 + i * 1.35));
+      og.gain.setValueAtTime(1e-4, at);
+      og.gain.exponentialRampToValueAtTime(peak, at + .004);
+      og.gain.exponentialRampToValueAtTime(1e-4, at + C.decays[i]);
+      o.connect(og).connect(g);
+      o.start(at); o.stop(at + C.decays[i] + .05);
+      oscs.push(o);
+    }
+
+    const v = { g, oscs, amp, at };
+    voices.push(v);
+    oscs[0].onended = ()=>{
+      const i = voices.indexOf(v);
+      if(i >= 0) voices.splice(i, 1);
+      try{ g.disconnect(); }catch(e){}
+    };
+  }
+
+  function setMuted(next){
+    muted = next;
+    store.muted = next;
+    paint();
+    if(!ctx) return;
+    if(muted){
+      try{ master.gain.setTargetAtTime(0, ctx.currentTime, .04); }catch(e){}
+      setTimeout(()=>{ if(muted && ctx && ctx.state === 'running') ctx.suspend(); }, 400);
+    } else {
+      if(ctx.state !== 'running') ctx.resume();
+      try{ master.gain.setTargetAtTime(C.masterGain, ctx.currentTime, .04); }catch(e){}
+    }
+  }
+
+  /* Never before a gesture: the context is not even constructed until the
+     visitor touches, clicks or types. */
+  function firstGesture(){
+    boot();
+    if(ctx && !muted && ctx.state !== 'running') ctx.resume();
+    ['pointerdown','keydown','touchstart'].forEach(t => removeEventListener(t, firstGesture, true));
+  }
+  ['pointerdown','keydown','touchstart'].forEach(t => addEventListener(t, firstGesture, true));
+
+  btn.addEventListener('click', ()=>{ boot(); setMuted(!muted); });
+
+  addEventListener('pagehide', ()=>{
+    voices = [];
+    if(ctx && ctx.state !== 'closed'){ try{ ctx.close(); }catch(e){} }
+  }, {once:true});
+
+  CHIME = { brush, rest };
+})();
+
+/* `fav` marks a place as one of ours — Hilga & Lucas's own shortlist. It is a flag
+   rather than a category so a favourite keeps its real category colour on the pin
+   and still appears under Coffee, Slow Bar or Foodies as well as under Our Favourites.
+
+   `url` is the exact Google Maps link for a place. When present the popup's "Get
+   directions" uses it verbatim instead of falling back to a name search, so guests
+   always land on the right doorway even if the pin itself is a few metres out.
+
+   Coordinates marked APPROX were placed from the street address rather than read off
+   Google Maps, so the pin may sit a short way from the door — the `url` link is exact
+   either way. Replace them by right-clicking the place in Google Maps and copying the
+   lat/long at the top of the menu; take the !3d/!4d pair out of the resulting URL rather
+   than the @ triple, which is only where the viewport happened to be sitting.
+
+   Treat a street address as worth roughly a neighbourhood, not a doorway: Estuary was
+   1.8km out that way before its real coordinates arrived, because the address named a
+   lane off Jl. Monjali and the lane runs a long way. The four APPROX pins left are all
+   on short, named streets, which is the case where the guess actually holds up.
+
+   The two wedding pins are APPROX but not guesses: both roads number their addresses in
+   kilometres, so each was triangulated along its road from a fixed point. The church sits
+   0.5km past Kopi Bukan Luwak (Jl. Kaliurang KM 16.5, below) on a bearing taken from that
+   entry and Bloomery's; the hotel sits 8km past JCM (Jl. Magelang KM 6, near Golden Geisha
+   below), which independently agrees with the 12km-from-Tugu distance the hotel publishes.
+   Both should be good to a few hundred metres. */
 const PLACES = [
+  /* THE WEDDING — the two fixed points of the whole guide. These render on the map
+     under every filter, not just their own tab (see renderMarkers). */
+  { category:"wedding", name:"Wyndham Garden Yogyakarta", img:"assets/places/wyndham.jpg", area:"Jl. Magelang KM 14 · Sleman", coords:[-7.6834,110.3479] /* APPROX */,
+    /* a tall portrait: centred, the 4:3 card keeps the pool and loses the roof's apex
+       entirely. Pulled up so the whole A-frame reads, ridge to eaves. */
+    focus:"50% 4%",
+    url:"https://maps.app.goo.gl/Kz4F5Mz2T4vXehVRA",
+    blurb:"Where we say the toast — the reception.",
+    story:"Our reception. A garden hotel out on Jl. Magelang, a good half hour north of the city centre, with room for all of us and a conference hall that will be unrecognisable by the evening.",
+    note:"Give yourself an hour from the centre in the late afternoon — Jl. Magelang is slow at rush hour. There are rooms here if you would rather not drive back." },
+  { category:"wedding", name:"Gereja Santa Maria Assumpta", img:"assets/places/gereja-maria-assumpta.jpg", area:"Jl. Kaliurang KM 17 · Pakem", coords:[-7.6664,110.4212] /* APPROX */,
+    url:"https://maps.app.goo.gl/thJ8sxDf5aL9yp5W9",
+    blurb:"Where we say the vows — the matrimony.",
+    story:"Our matrimony. The parish church at Pakem, up Jl. Kaliurang on the road to Merapi — a plain, quiet building from 1956 with the Sumur Kitiran Mas in its grounds, and noticeably cooler air than the city. Kopi Bukan Luwak, further down this page, is barely ten minutes further up the same road.",
+    note:"Leave early — it is a good forty minutes north of the centre. From here it is roughly half an hour west across to the reception." },
+
   /* COFFEE */
-  { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203],
+  { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203], fav:true,
     blurb:"A buzzy all-day cafe — and very good matcha.",
     story:"A local favourite with branches across the city: generous indoor and outdoor seating, arabica coffee, pastries and rice bowls. Easy to settle into for an hour or three.",
     note:"Order the matcha. Comfortable for working; busiest in the evenings." },
-  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
+  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164], fav:true,
     blurb:"A small roastery for people who take coffee seriously.",
     story:"A minimal, focused coffee bar and roastery with local, imported and exotic beans — strong on manual brews, and you can buy beans to take home.",
     note:"Ask for a manual brew and let the barista choose the bean. Free parking." },
-  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
+  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906], fav:true,
     blurb:"A bamboo-forest cafe with vinyl, jazz and mocktails.",
     story:"Tucked into the cooler hills north of the city, ringed by bamboo, with a vinyl soundtrack and a menu of coffee and mocktails. Peaceful, a little remote, lovely by daylight.",
     note:"The Mocktail Dewandaru is the one. The lane in is narrow — come before dusk." },
-  { category:"coffee", name:"Space Roastery", area:"Mangkubumi · near Tugu", coords:[-7.7852554,110.3665428],
+  { category:"coffee", name:"Space Roastery", img:"assets/places/space-roastery.jpg", area:"Mangkubumi · near Tugu", coords:[-7.7852554,110.3665428],
     blurb:"A 24-hour open-space roastery near the station.",
     story:"Set in a converted heritage home minutes from Tugu Station and Malioboro, open round the clock, known for an exclusive bean collection and excellent manual brews.",
     note:"Try the Geisha bean, and grab a seat in the front yard if you can." },
-  { category:"coffee", name:"KomiTokoro", area:"Banteng · Ngaglik", coords:[-7.7338069,110.3900389],
+  { category:"coffee", name:"KomiTokoro", img:"assets/places/komitokoro.jpg", area:"Banteng · Ngaglik", coords:[-7.7338069,110.3900389],
     blurb:"A tiny, homey neighbourhood coffee bar.",
     story:"A small, much-loved spot with a rotating selection of beans from roasteries across Indonesia, happy to take special requests. The dirty latte and matcha are favourites.",
     note:"Small and often full — go off-peak. They'll do espresso over a V60." },
-  { category:"coffee", name:"Bloomery Cake & Patisserie", area:"Jl. Kaliurang (Jakal)", coords:[-7.7602593,110.3810617],
+  { category:"coffee", name:"Bloomery Cake & Patisserie", img:"assets/places/bloomery.jpg", area:"Jl. Kaliurang (Jakal)", coords:[-7.7602593,110.3810617],
     blurb:"The mille crepe cakes are the reason to come.",
     story:"A bright patisserie on Jl. Kaliurang turning out some of the best mille crepe and layered cakes in the city, alongside coffee and desserts.",
     note:"Tiramisu or matcha mille crepe with an iced americano. Trust us." },
-  { category:"coffee", name:"Michael Kreme Gelato", area:"Palagan · Sariharjo", coords:[-7.7279421,110.3776308],
+  { category:"coffee", name:"Michael Kreme Gelato", img:"assets/places/michael-kreme.jpg", area:"Palagan · Sariharjo", coords:[-7.7279421,110.3776308],
     blurb:"Viral gelato, open around the clock.",
     story:"A wildly popular 24-hour gelato shop with thick, creamy scoops and generous portions. Expect a queue at peak times.",
     note:"The signature pistachio is the move — and the cones taste like egg rolls." },
-  { category:"coffee", name:"Machia Social Space", area:"Palagan · Sariharjo", coords:[-7.7345839,110.3776504],
+  { category:"coffee", name:"Machia Social Space", img:"assets/places/machia.jpg", area:"Palagan · Sariharjo", coords:[-7.7345839,110.3776504],
     blurb:"A 24-hour, matcha-forward social space.",
     story:"A spacious, 24-hour cafe built for working, meeting or a late sit-down, with a serious matcha menu and indoor/outdoor seating.",
     note:"The ceremonial matcha latte; ask for less sugar if you like it grassy." },
+  { category:"coffee", name:"Chéri Patisserie & Brasserie", img:"assets/places/cheri.jpg", area:"Kranggan · Cokrodiningratan", coords:[-7.7800,110.3654] /* APPROX */,
+    url:"https://maps.app.goo.gl/DjxjJGn878tQmTAT7",
+    blurb:"A proper French patisserie, ten minutes from Tugu.",
+    story:"A patisserie and brasserie on Jl. Kranggan doing the French things properly — laminated pastry, tarts, a full brasserie menu — in a bright room just north of Tugu. Open from breakfast until late.",
+    note:"Come for the viennoiserie in the morning, before the counter is picked over." },
+  { category:"coffee", name:"Estuary Café", img:"assets/places/estuary.jpg", area:"Gemawang · Sinduadi", coords:[-7.7634102,110.3698868],
+    url:"https://maps.app.goo.gl/sn9n8bxcutR1Rcck7",
+    blurb:"Concrete, greenery and the Code river below.",
+    story:"Hidden down a gang off Jl. Monjali and built out over the bank of Kali Code: an industrial, concrete-finish room that opens onto trees and river. Far greener and quieter than the address suggests.",
+    note:"Ask for a table on the river side. The lane in is narrow — go slowly, it is worth it." },
+  { category:"coffee", name:"99 Coffee Roaster", img:"assets/places/99-coffee-roaster.jpg", area:"Gejayan · Jl. Affandi", coords:[-7.7612526,110.3937996],
+    url:"https://maps.app.goo.gl/uFu6qDDNo45GHebLA",
+    blurb:"A big, easy roastery on Gejayan, open from six.",
+    story:"The Gejayan branch of a local roastery — generous, high-ceilinged, and busy from early morning until midnight, with their own beans, a full kitchen and enough space to actually get something done.",
+    note:"Opens at 6am, which makes it the best jet-lag breakfast in the city." },
 
   /* SLOW BAR */
   { category:"slowbar", name:"TUSEN", img:"assets/places/tusen.jpg", area:"Kotabaru", coords:[-7.7857793,110.3707008],
@@ -651,9 +1672,14 @@ const PLACES = [
     blurb:"A big, leafy resto-bar — pool, live music, the works.",
     story:"A spacious restaurant and bar with indoor and outdoor areas, a pool, live music, a bakery and gelato stand, and a wide menu from pizza and pasta to local dishes, cocktails and wine.",
     note:"Great for a relaxed group evening. Note the tax and service charge." },
+  { category:"slowbar", name:"Sakapatat Social House & Resto", img:"assets/places/sakapatat.jpg", area:"Pakuningratan · Jetis", coords:[-7.7793,110.3671] /* APPROX */,
+    url:"https://maps.app.goo.gl/jvjaePg7x9tdWazu5",
+    blurb:"An old house, a vintage room, and thirty-odd beers.",
+    story:"A social house set in a lovely old Jetis home — heavy timber, vintage fittings, a courtyard — with the widest beer list in the city, local and imported, and a western kitchen to go with it.",
+    note:"Sit in the courtyard. Open until 1am, and 2am at weekends." },
 
   /* FOOD */
-  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
+  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439], fav:true,
     blurb:"The legendary goat sate grilled on iron spokes.",
     story:"Perhaps Jogja's most famous sate klathak: chunks of goat seasoned simply with salt, grilled on iron bicycle spokes, served with a warm curry broth. Worth the trip out to Bantul.",
     note:"Don't skip the gulai. It's a 25–30 minute drive south of the centre." },
@@ -665,11 +1691,11 @@ const PLACES = [
     blurb:"Kampung-style Javanese feasting in a joglo, up north.",
     story:"From the people behind Kopi Klotok, but calmer: self-service Javanese village cooking — mangut asap, telur gimbal, mendoan — in a traditional joglo near Kaliurang. You pay at the end by showing a photo of your plate.",
     note:"Go early for coro bikang from 7am. The smoked-fish mangut asap is the pick." },
-  { category:"food", name:"Golden Geisha Ramen", area:"Jl. Magelang · JCM", coords:[-7.7537178,110.3602969],
+  { category:"food", name:"Golden Geisha Ramen", img:"assets/places/golden-geisha-ramen.jpg", area:"Jl. Magelang · JCM", coords:[-7.7537178,110.3602969],
     blurb:"Arguably the best ramen in the city.",
     story:"A hugely popular Japanese ramen spot on Jl. Magelang, known for rich broths and tender wagyu and saikoro beef. Expect a queue.",
     note:"The Saikoro and Wagyu Baitan are the bestsellers — arrive early or reserve." },
-  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
+  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686], fav:true,
     blurb:"Smashed fried chicken with a serious sambal.",
     story:"A beloved blue-tent warung where they truly geprek the chicken — crisp, tender, then smashed with a punchy sambal bawang. Pick your pieces and chilli level at the counter.",
     note:"The sambal is no joke — ask for fewer chillies if unsure. Don't miss the tongseng." },
@@ -681,15 +1707,15 @@ const PLACES = [
     blurb:"Authentic Balinese nasi campur (pork / non-halal).",
     story:"Some of the best Balinese food in Jogja — bold, spicy nasi campur babi with tender pork and proper sambal. A taste of Bali east of the city. Closed Mondays.",
     note:"The nasi campur and babi goreng. There's a special menu on Sundays." },
-  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
+  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656], fav:true,
     blurb:"Chinese-style morning porridge with stir-fried toppings.",
     story:"A long-running breakfast spot serving light, well-seasoned porridge with unusual stir-fried toppings, plus nasi gongso and Hainan fried rice. Mornings only, closed Sundays.",
     note:"A great early breakfast — try the nasi gongso and add cakwe." },
-  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
+  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081], fav:true,
     blurb:"Generous, comforting Teochew-style Chinese food.",
     story:"A long-time student favourite near Mrican: big portions of Teochew-Chinese cooking at gentle prices — five-spice ngohyang chicken, kangkung hotplate, seafood hotplate.",
     note:"The ngohyang chicken and a hotplate. Cheap, fast, always packed." },
-  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
+  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777], fav:true,
     blurb:"Springy beef noodles — and the best wontons.",
     story:"A noodle shop known for thin, springy beef noodles and outstanding pangsit (wontons), both fried and boiled. Closed Thursdays and Sundays.",
     note:"Order both the boiled and fried pangsit. Lunchtime only." },
@@ -697,10 +1723,20 @@ const PLACES = [
     blurb:"Tender pork sate in a leafy, tucked-away spot (non-halal).",
     story:"A Chinese-Indonesian pork specialist set among trees inside the Puskat compound: juicy grilled sate babi, rich babi kecap and pork bakso.",
     note:"The sate babi and babi kecap. A calm, green setting." },
-  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
+  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610], fav:true,
     blurb:"Charcoal-cooked Javanese noodles, late into the night.",
     story:"Authentic bakmi Jawa cooked over a charcoal fire — smoky bakmi godog and goreng, ayam rica, magelangan — in a warm, traditional room with an angkringan section. Open till 2am.",
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
+  { category:"food", name:"Mediterranea Restaurant", img:"assets/places/mediterranea.jpg", area:"Tirtodipuran · Mantrijeron", coords:[-7.8174,110.3633] /* APPROX */, fav:true,
+    url:"https://maps.app.goo.gl/JiDgL5m2TkAcZ3g9A",
+    blurb:"Chef Kamil's French kitchen, and our own favourite.",
+    story:"A French and Mediterranean kitchen on Jl. Tirtodipuran, run by Chef Kamil since 2012 and cooked fresh each day. The room everyone in Jogja goes to when they want a night off Indonesian food — and the one we keep coming back to.",
+    note:"Book ahead, it fills every night. Breakfast from 8am is the quiet secret." },
+  { category:"food", name:"Masama by Kamil", img:"assets/places/masama.jpg", area:"Tirtodipuran · Mantrijeron", coords:[-7.8174,110.3636] /* APPROX */,
+    url:"https://maps.app.goo.gl/G2BPWgktf3x7koCp6",
+    blurb:"Mediterranea's younger sibling, next door.",
+    story:"Chef Kamil's second room, literally next door to Mediterranea: western cooking with an Asian hand, lighter and more playful than the original — the duck sate is the dish people come back for.",
+    note:"If Mediterranea is full, walk one door up. The sate bebek is the order." },
 ];
 
 /* color = accent used on pins/card dots (light, decorative). active = darker shade used behind
@@ -708,6 +1744,12 @@ const PLACES = [
 const CATS = {
   all:     { label:"All",      color:null,      active:null,
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M14.6 9.4 12.9 12.9 9.4 14.6 11.1 11.1Z"/></svg>` },
+  wedding: { label:"The Wedding", color:"#B08D57", active:"#7E6437",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.1" cy="14.6" r="5"/><circle cx="14.9" cy="14.6" r="5"/><path d="M12 3.6 13.9 6.1h-3.8Z"/></svg>` },
+  /* `rail` is the heading over the card rail, where there is room for the warmer,
+     longer name the cramped tab strip cannot carry. */
+  favourites: { label:"Favourites", rail:"Our Favourites", color:"#A85751", active:"#87413C",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.7 2.55 5.4 5.75.85-4.15 4.2.98 5.98L12 17.3l-5.13 2.83.98-5.98-4.15-4.2 5.75-.85Z"/></svg>` },
   coffee:  { label:"Coffee",   color:"#A67C52", active:"#7A5A3D",
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5Z"/><path d="M16 10.3h1.3a2.2 2.2 0 1 1 0 4.4H16"/><path d="M8.6 4.3c-.6.7-.6 1.3 0 2M12 4.3c-.6.7-.6 1.3 0 2"/></svg>` },
   slowbar: { label:"Slow Bar", color:"#6E4A5E", active:"#5C3B49",
@@ -717,28 +1759,37 @@ const CATS = {
   friends: { label:"From Friends", color:"#5B7C99", active:"#48627A",
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C7.7 16.1 4.7 13 4.7 9.9 4.7 7.5 6.5 5.7 8.7 5.7c1.3 0 2.5.6 3.3 1.7.8-1.1 2-1.7 3.3-1.7 2.2 0 4 1.8 4 4.2 0 3.1-3 6.2-7.3 9.6Z"/></svg>` }
 };
-const ORDER = ["all","coffee","slowbar","food","friends"];
+const ORDER = ["all","wedding","favourites","coffee","slowbar","food","friends"];
 
-/* guest identity + their recommendations, remembered on this device */
-const store = {
-  read(k, fallback){ try{ const v=localStorage.getItem(k); return v===null?fallback:v; }catch(e){ return fallback; } },
-  write(k, v){ try{ localStorage.setItem(k, v); }catch(e){} },
-  get name(){ return this.read('oy_name',''); },
-  set name(v){ this.write('oy_name', v); },
-  get skippedWelcome(){ return this.read('oy_skip','')==='1'; },
-  set skippedWelcome(v){ this.write('oy_skip', v?'1':''); },
-  get recs(){ try{ return JSON.parse(this.read('oy_recs','[]'))||[]; }catch(e){ return []; } },
-  set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
+/* "Our Favourites" is a flag, not a category — every other tab matches on category. */
+const matchesCat = (p,cat) => cat==='all' ? true : cat==='favourites' ? !!p.fav : p.category===cat;
+
+/* merged data: curated PLACES + the approved tips from the sheet + this guest's own.
+   SHARED arrives asynchronously and may echo a tip this device already holds, so
+   local recs are dropped once their id comes back approved — otherwise the guest
+   who sent it would see their own pin twice. */
+let ALL = [], SHARED = [];
+/* Cards and popups are built with innerHTML, and the curated PLACES below are
+   written by us, so they may carry entities and the odd tag on purpose. A
+   friend's words are not ours, and once tips are shared they render in every
+   other guest's browser — so everything a guest typed is escaped here, at the
+   single door all friend data comes through, and their link is allowed only if
+   it really is http(s). */
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => { try{ const p=new URL(String(u)); return (p.protocol==='http:'||p.protocol==='https:')?p.href:''; }catch(e){ return ''; } };
+
+const recAsPlace = r => {
+  const by=esc(r.by), why=esc(r.why);
+  return {
+    category:'friends', name:esc(r.place), area: by ? `by ${by}` : 'by a friend',
+    coords:r.coords || null, blurb:why, story:why, url:safeUrl(r.url),
+    note:`A tip from ${by || 'a friend'} — terima kasih!`
+  };
 };
-
-/* merged data: curated PLACES + this guest's own recommendations */
-let ALL = [];
 function refreshAll(){
-  ALL = PLACES.concat(store.recs.map(r => ({
-    category:'friends', name:r.place, area: r.by ? `by ${r.by}` : 'by a friend',
-    coords:r.coords || null, blurb:r.why, story:r.why,
-    note:`A tip from ${r.by || 'a friend'} — terima kasih!`
-  })));
+  const landed=new Set(SHARED.map(r=>String(r.id)));
+  const mine=store.recs.filter(r=>!landed.has(String(r.t)));
+  ALL = PLACES.concat(SHARED.map(recAsPlace), mine.map(recAsPlace));
 }
 refreshAll();
 const GRADS = [["#D6CEBF","#9A9082"],["#CFC9BD","#8C8578"],["#DAD0C0","#A2917E"],["#CDC8BC","#928B7D"],["#D8CFC1","#9C9184"],["#D0C7B6","#8E8574"]];
@@ -764,7 +1815,7 @@ const highlightEl=document.createElement('span');
 highlightEl.className='tab-highlight'; highlightEl.setAttribute('aria-hidden','true');
 switchEl.appendChild(highlightEl);
 
-const countFor = key => key==='all' ? ALL.length : ALL.filter(p=>p.category===key).length;
+const countFor = key => ALL.filter(p=>matchesCat(p,key)).length;
 function updateTabCounts(){
   [...switchEl.querySelectorAll('.tab')].forEach(b=>{ b.querySelector('.num').textContent = countFor(b.dataset.cat); });
   requestAnimationFrame(moveHighlight);   /* counts can change tab widths */
@@ -789,7 +1840,7 @@ function moveHighlight(){
 }
 requestAnimationFrame(moveHighlight);
 
-const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
+const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=>matchesCat(p,cat));
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
 const pinFor  = idx => { const m=markers.find(x=>x.idx===idx); return m? m.el : null; };
 const lngLat  = p => [p.coords[1], p.coords[0]];   /* MapLibre uses [lng, lat] */
@@ -798,12 +1849,16 @@ function renderCards(cat){
   cardsEl.innerHTML='';
   placesFor(cat).forEach(p=>{
     const card=document.createElement('article');
-    card.className='card'; card.dataset.idx=p._i;
-    card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}`);
-    const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async">` : ``;
+    card.className='card' + (p.category==='wedding'?' card-wedding':''); card.dataset.idx=p._i;
+    card.tabIndex=0; card.setAttribute('role','button');
+    card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}${p.fav?', one of our favourites':''}`);
+    /* Cards are 4:3 and the photos are not, so object-fit:cover crops them — a tall
+       portrait loses half its height, taken from the middle by default. `focus` moves
+       that window when the subject is not in the centre of the frame. */
+    const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async"${p.focus?` style="object-position:${p.focus}"`:``}>` : ``;
     card.innerHTML=`
       <div class="c-img" style="--g:${gradFor(p.name)}">${img}</div>
-      <span class="c-cat"><span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
+      <span class="c-cat">${p.fav?`<span class="c-fav" aria-hidden="true">&#9733;</span>`:``}<span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
       <h4>${p.name}</h4>
       <p class="c-desc">${p.story}</p>
       <span class="c-more link-u">Discover more <span>&rarr;</span></span>`;
@@ -817,12 +1872,17 @@ function renderCards(cat){
 
 function popupHtml(p){
   const q=encodeURIComponent(`${p.name} Yogyakarta`);
-  return `<div class="pop">
+  /* p.url is the place's own Google Maps link, so directions are exact even where the
+     pin was placed from a street address. Friends' recommendations never carry one and
+     fall back to a name search. */
+  const href = p.url || `https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<div class="pop${p.category==='wedding'?' pop-wedding':''}">
     <span class="eyebrow">${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
     <h3>${p.name}</h3>
+    ${p.fav?`<span class="pop-fav"><span aria-hidden="true">&#9733;</span> One of our favourites</span>`:``}
     <p class="pop-story">${p.story}</p>
     <div class="pop-tip"><span class="eyebrow">Our tip</span><div class="txt">${p.note}</div></div>
-    <a class="pop-link link-u" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">Get directions <span>&rarr;</span></a>
+    <a class="pop-link link-u" target="_blank" rel="noopener" href="${href}">Get directions <span>&rarr;</span></a>
   </div>`;
 }
 
@@ -870,17 +1930,35 @@ function initMap(){
   });
 }
 
-function renderMarkers(cat){
+/* The wedding places are the fixed points of the guide, so they stay pinned under
+   every filter — the venue is never more than a glance away, whatever you browse. */
+const weddingPlaces = () => ALL.map((p,i)=>({...p,_i:i})).filter(p=>p.category==='wedding');
+
+function legendFor(cat, n){
+  if(cat==='all') return `${n} favourite spots across the city`;
+  if(cat==='wedding') return `Where the day happens`;
+  if(cat==='favourites') return `${n} places we go back to, again and again`;
+  return `${n} ${CATS[cat].label} spots we love`;
+}
+
+function renderMarkers(cat, opts){
+  const fit = !opts || opts.fit !== false;
   const list=placesFor(cat);
-  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
+  legendEl.textContent = legendFor(cat, list.length);
   if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
   markers.forEach(m=>m.marker.remove()); markers=[];
-  list.filter(p=>p.coords).forEach(p=>{
+  const shown=new Set(list.map(p=>p._i));
+  const pinned=list.concat(weddingPlaces().filter(p=>!shown.has(p._i)));
+  pinned.filter(p=>p.coords).forEach(p=>{
+    const wed = p.category==='wedding';
     const el=document.createElement('div');
-    el.className='pin';
-    el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label', `Show ${p.name} on the map`);
+    el.className = wed ? 'pin pin-wedding' : 'pin';
+    el.tabIndex=0; el.setAttribute('role','button');
+    el.setAttribute('aria-label', wed ? `Show ${p.name}, a wedding venue, on the map` : `Show ${p.name} on the map`);
     el.style.setProperty('--pin-color', CATS[p.category].color);
-    el.innerHTML=`<div class="pill">${p.name}</div>`;
+    el.innerHTML = wed
+      ? `<div class="pill pill-wedding"><span class="pin-rings" aria-hidden="true">${CATS.wedding.icon}</span>${p.name}</div>`
+      : `<div class="pill">${p.fav?`<span class="pin-star" aria-hidden="true">&#9733;</span>`:``}${p.name}</div>`;
     el.addEventListener('click', ev=>{ ev.stopPropagation(); focusPlace(p._i,false); });
     el.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); focusPlace(p._i,false); } });
     el.addEventListener('mouseenter', ()=>cardFor(p._i)?.classList.add('active'));
@@ -888,8 +1966,10 @@ function renderMarkers(cat){
     const marker=new maplibregl.Marker({element:el, anchor:'center'}).setLngLat(lngLat(p)).addTo(map);
     markers.push({idx:p._i, el, marker});
   });
+  /* frame the chosen category only — the always-on wedding pins must not drag the
+     viewport 15km north every time you filter for coffee in the centre */
   const locs=list.filter(p=>p.coords);
-  if(locs.length){
+  if(locs.length && fit){
     const b=new maplibregl.LngLatBounds();
     locs.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
@@ -980,7 +2060,7 @@ function selectCategory(cat){
   active=cat;
   [...switchEl.querySelectorAll('.tab')].forEach(b=>b.setAttribute('aria-selected', b.dataset.cat===cat?'true':'false'));
   moveHighlight();
-  railTitle.textContent=CATS[cat].label;
+  railTitle.textContent=CATS[cat].rail || CATS[cat].label;
   deselect();
   cardsEl.style.opacity=0;
   setTimeout(()=>{ renderCards(cat); cardsEl.scrollTo({left:0}); cardsEl.style.transition='opacity .5s'; cardsEl.style.opacity=1; },180);
@@ -994,39 +2074,61 @@ document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 const nav=document.getElementById('nav');
 addEventListener('scroll', ()=>{ nav.classList.toggle('solid', window.scrollY > window.innerHeight*0.72); }, {passive:true});
 
-/* ---- floating gallery: photos drift with the scroll wheel at depth-scaled speeds ---- */
+/* ---- drifting gallery: two rows of photographs pass in opposite directions ---- */
 const noteEl=document.querySelector('.note');
-const gfloats=[...document.querySelectorAll('.gfloat')];
-gfloats.forEach(f=>{ f.dataset.rotBase=parseFloat(getComputedStyle(f).getPropertyValue('--rot'))||0; });
+const strips=[...document.querySelectorAll('.note-strip')].map(el=>{
+  const track=el.querySelector('.strip-track');
+  return { el, track, dir:+el.dataset.dir||1, over:0, amp:0, base:[...track.children] };
+});
+/* A row has to be wider than the window or there is nothing to slide and the far end
+   sits there as bare wall — which is exactly what fourteen cards do on an ultra-wide
+   monitor. Repeat the set until the track clears the window with room to travel. The
+   clones are decorative (the whole strip is aria-hidden), they are lazy so the
+   off-screen ones never fetch, and identical URLs come from cache regardless. */
+function fillStrip(s){
+  const need = s.el.clientWidth * 1.8;
+  let guard = 0;
+  while(s.track.scrollWidth < need && guard++ < 8){
+    s.base.forEach(n=>s.track.appendChild(n.cloneNode(true)));
+  }
+}
+/* Measured on resize, never per frame. The card box is fixed by --gw and the 4/5
+   aspect-ratio, so a track's width is known before a single photograph has loaded —
+   which leaves the scroll handler with no layout reads at all. The old version called
+   getBoundingClientRect() on nine elements every frame, forcing a synchronous layout
+   each time; this writes two transforms and reads nothing. */
+function measureStrips(){
+  strips.forEach(s=>{
+    fillStrip(s);
+    s.over = Math.max(0, s.track.scrollWidth - s.el.clientWidth);
+    s.amp  = Math.min(s.over, s.el.clientWidth * 0.55);
+  });
+}
 function galleryFrame(){
   const r=noteEl.getBoundingClientRect();
   const total=Math.max(1, r.height-innerHeight);
   const p=Math.min(1, Math.max(0, -r.top/total));      /* 0→1 through the section */
-  const travel=Math.min(300, innerHeight*0.34);
-  const midY=innerHeight/2;
-  /* read positions first (from the previous frame's transforms), then write —
-     avoids interleaved layout reads/writes */
-  const centers=gfloats.map(f=>{ const b=f.getBoundingClientRect(); return b.top+b.height/2; });
-  gfloats.forEach((f,i)=>{
-    const d=+f.dataset.depth||1, z=+f.dataset.z||0, dx=+f.dataset.dx||0;
-    const phase=i*1.7;
-    const y=(0.5-p)*2*travel*d;
-    /* sway: a gentle S-curve drift + slight tilt change, phase-shifted per photo
-       so they float like loose paper instead of moving in lockstep */
-    const x=(0.5-p)*2*dx + Math.sin(p*Math.PI*2.2+phase)*9*d;
-    const tilt=(+f.dataset.rotBase) + Math.sin(p*Math.PI*2+phase)*2.2;
-    /* depth breathing: swell slightly near the middle of the screen, ease off at the edges */
-    const closeness=Math.max(0, 1-Math.abs(centers[i]-midY)/midY);
-    const s=(0.97+closeness*0.09).toFixed(3);
-    f.style.transform=`translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z}px) rotate(${tilt.toFixed(2)}deg) scale(${s})`;
+  strips.forEach(s=>{
+    /* clamped to [-over, 0], so a row is always full-bleed: it can never drift far
+       enough to pull its own end into view and leave a bald patch */
+    const x = s.dir < 0 ? -s.amp * p : -s.amp * (1 - p);
+    s.track.style.transform=`translate3d(${x.toFixed(1)}px,0,0)`;
   });
 }
-if(noteEl && gfloats.length && !matchMedia('(prefers-reduced-motion: reduce)').matches){
-  let gTick=false;
-  const onGScroll=()=>{ if(!gTick){ gTick=true; requestAnimationFrame(()=>{ gTick=false; galleryFrame(); }); } };
-  addEventListener('scroll', onGScroll, {passive:true});
-  addEventListener('resize', onGScroll, {passive:true});
-  galleryFrame();
+if(noteEl && strips.length){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){
+    /* parked mid-track rather than hidden: the photographs are the content here, it
+       is only their movement that some people cannot take */
+    measureStrips();
+    strips.forEach(s=>{ s.track.style.transform=`translate3d(${(-s.over/2).toFixed(1)}px,0,0)`; });
+  } else {
+    let gTick=false;
+    const onGScroll=()=>{ if(!gTick){ gTick=true; requestAnimationFrame(()=>{ gTick=false; galleryFrame(); }); } };
+    addEventListener('scroll', onGScroll, {passive:true});
+    addEventListener('resize', ()=>{ measureStrips(); onGScroll(); }, {passive:true});
+    measureStrips();
+    galleryFrame();
+  }
 }
 let rt; function reflow(){ clearTimeout(rt); rt=setTimeout(()=>{ map&&map.resize(); moveHighlight(); },200); }
 addEventListener('resize', reflow); addEventListener('orientationchange', reflow);
@@ -1077,29 +2179,252 @@ if(!store.name && !store.skippedWelcome){
   personalize();
 }
 
-/* ---- a friend's recommendation: save locally, pin via geocoding, email to us ---- */
+/* ---- a friend's recommendation ------------------------------------------
+   The guest types, Photon answers with real OpenStreetMap places, and picking
+   one carries its exact coordinates into the form. Photon is the free, keyless
+   geocoder komoot runs, and unlike Nominatim it is built for search-as-you-type
+   — Nominatim's usage policy forbids exactly this, which is why the old
+   guess-on-submit lookup has gone. It is also OSM data, like the basemap, so
+   the licence travels with the pin; Google's Places autocomplete could not be
+   used here at any price, as its terms forbid showing Places results on a
+   non-Google map, and this map is MapLibre.
+
+   OSM has never heard of half the good warungs in this city, so the dropdown
+   is only the fast path: #rec-mini lets anyone drop the pin by hand, and that
+   is the one route that always works. ------------------------------------- */
 const recForm=document.getElementById('rec-form');
 const recStatus=document.getElementById('rec-status');
+const recPlaceInput=document.getElementById('rec-place');
+const recLinkInput=document.getElementById('rec-link');
+const recSuggestEl=document.getElementById('rec-suggest');
+const recPinState=document.getElementById('rec-pin-state');
+const recPinToggle=document.getElementById('rec-pin-toggle');
+const recMini=document.getElementById('rec-mini');
 
-function geocodeRec(rec){
-  /* best effort: find the place on the map so it gets a real pin. Guests won't
-     know coordinates, so we ask OpenStreetMap's free geocoder and sanity-check
-     the hit is actually around Yogyakarta before pinning it. */
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(rec.place+', Yogyakarta, Indonesia')}`)
-    .then(r=>r.ok?r.json():[])
-    .then(hits=>{
-      if(!hits.length) return;
-      const lat=+hits[0].lat, lon=+hits[0].lon;
-      if(lat<-8.4||lat>-7.2||lon<110.0||lon>110.9) return;
-      const recs=store.recs;
-      const mine=recs.find(x=>x.t===rec.t);
-      if(!mine) return;
-      mine.coords=[lat,lon];
-      store.recs=recs;
-      refreshAll();
-      if(active==='friends'||active==='all') renderMarkers(active);
+/* Yogyakarta and its ring of regencies — anything outside is a wrong hit */
+const JOGJA={lat:-7.797, lon:110.370, min:[-8.4,110.0], max:[-7.2,110.9]};
+const inJogja=(lat,lon)=>lat>=JOGJA.min[0]&&lat<=JOGJA.max[0]&&lon>=JOGJA.min[1]&&lon<=JOGJA.max[1];
+
+let recCoords=null;        /* [lat,lng] once the guest has settled on a spot */
+let recCoordsFrom='';      /* 'list' or 'pin' — only for the wording below */
+
+const PIN_PROMPT   = `Type a few letters and pick it from the list, so it lands on the right corner.`;
+const PIN_NOTFOUND = `OpenStreetMap hasn't heard of this one — tap <b>Place the pin myself</b> to show us where it is.`;
+
+function setRecCoords(coords, label, from){
+  recCoords=coords; recCoordsFrom=from;
+  recPinState.classList.toggle('set', !!coords);
+  recPinState.innerHTML = coords
+    ? (from==='pin' ? `Pinned where you put it. <b>${esc(label)||'On the map'}</b>` : `Found it — <b>${esc(label)}</b>`)
+    : PIN_PROMPT;
+  recPinToggle.textContent = coords ? 'Move the pin' : 'Place the pin myself';
+  if(miniMarker && coords) miniMarker.setLngLat([coords[1],coords[0]]);
+}
+
+/* ---- the dropdown ---- */
+let recAbort=null, recTimer=null, recHits=[], recCursor=-1;
+
+const photonLabel=p=>{
+  const bits=[p.street&&(p.housenumber?`${p.street} ${p.housenumber}`:p.street), p.district, p.city||p.county, p.state]
+    .filter(Boolean);
+  return [...new Set(bits)].slice(0,3).join(' · ');
+};
+
+function closeSuggest(){
+  recSuggestEl.hidden=true; recSuggestEl.innerHTML='';
+  recPlaceInput.setAttribute('aria-expanded','false');
+  recPlaceInput.removeAttribute('aria-activedescendant');
+  recHits=[]; recCursor=-1;
+}
+
+function paintSuggest(){
+  recSuggestEl.innerHTML=recHits.map((h,i)=>
+    `<li id="rec-opt-${i}" role="option" aria-selected="${i===recCursor}"><b>${esc(h.name)}</b>${h.sub?`<small>${esc(h.sub)}</small>`:''}</li>`
+  ).join('');
+  [...recSuggestEl.children].forEach((li,i)=>{
+    li.addEventListener('mousedown', ev=>{ ev.preventDefault(); pickHit(i); });
+  });
+  recSuggestEl.hidden=false;
+  recPlaceInput.setAttribute('aria-expanded','true');
+}
+
+function moveCursor(step){
+  if(!recHits.length) return;
+  recCursor=(recCursor+step+recHits.length)%recHits.length;
+  [...recSuggestEl.children].forEach((li,i)=>li.setAttribute('aria-selected', i===recCursor));
+  recPlaceInput.setAttribute('aria-activedescendant', `rec-opt-${recCursor}`);
+  recSuggestEl.children[recCursor]?.scrollIntoView({block:'nearest'});
+}
+
+function pickHit(i){
+  const h=recHits[i]; if(!h) return;
+  recPlaceInput.value=h.name;
+  document.getElementById('f-place').classList.remove('invalid');
+  setRecCoords(h.coords, h.sub||h.name, 'list');
+  closeSuggest();
+  if(!recMini.hidden) centreMini();
+}
+
+function searchPlaces(q){
+  if(recAbort) recAbort.abort();
+  recAbort=new AbortController();
+  const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`+
+            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&zoom=12&limit=8&lang=en`;
+  fetch(url,{signal:recAbort.signal})
+    .then(r=>r.ok?r.json():null)
+    .then(data=>{
+      if(!data||!data.features) return closeSuggest();
+      recHits=data.features
+        .map(f=>({
+          name:f.properties.name||f.properties.street||'',
+          sub:photonLabel(f.properties),
+          coords:[f.geometry.coordinates[1], f.geometry.coordinates[0]]
+        }))
+        .filter(h=>h.name && inJogja(h.coords[0], h.coords[1]))
+        .slice(0,6);
+      recCursor=-1;
+      if(!recHits.length){
+        /* No shame in this — OSM simply doesn't know every warung. Say so on the
+           line below rather than in the dropdown: the dropdown hangs directly over
+           the "place the pin myself" button, so a message there would cover the very
+           thing it's telling them to press. */
+        closeSuggest();
+        if(!recCoords) recPinState.innerHTML=PIN_NOTFOUND;
+        return;
+      }
+      if(!recCoords) recPinState.innerHTML=PIN_PROMPT;   /* clear a stale "not found" */
+      paintSuggest();
     })
-    .catch(()=>{});
+    .catch(err=>{ if(err.name!=='AbortError') closeSuggest(); });
+}
+
+recPlaceInput.addEventListener('input', ()=>{
+  const q=recPlaceInput.value.trim();
+  if(recCoordsFrom==='list') setRecCoords(null,'','');   /* they've moved on from the chosen place */
+  clearTimeout(recTimer);
+  if(q.length<3) return closeSuggest();
+  recSuggestEl.innerHTML=`<li class="rec-searching">Looking…</li>`;
+  recSuggestEl.hidden=false;
+  recTimer=setTimeout(()=>searchPlaces(q), 260);   /* debounced, so komoot's free service isn't hammered */
+});
+
+recPlaceInput.addEventListener('keydown', e=>{
+  if(recSuggestEl.hidden) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); moveCursor(1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); moveCursor(-1); }
+  else if(e.key==='Enter' && recCursor>-1){ e.preventDefault(); pickHit(recCursor); }
+  else if(e.key==='Escape'){ closeSuggest(); }
+});
+recPlaceInput.addEventListener('blur', ()=>setTimeout(closeSuggest, 120));
+
+/* ---- the fallback: drop the pin by hand ---- */
+let miniMap=null, miniMarker=null;
+
+function centreMini(){
+  if(!miniMap) return;
+  const c=recCoords||[JOGJA.lat, JOGJA.lon];
+  miniMap.setCenter([c[1],c[0]]);
+  miniMap.setZoom(recCoords?15.5:11.5);
+}
+
+function initMini(){
+  miniMap=new maplibregl.Map({
+    container:'rec-mini-map',
+    style:'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+    center:[recCoords?recCoords[1]:JOGJA.lon, recCoords?recCoords[0]:JOGJA.lat],
+    zoom:recCoords?15.5:11.5,
+    attributionControl:true, dragRotate:false, pitchWithRotate:false
+  });
+  miniMap.touchZoomRotate.disableRotation();
+  miniMap.addControl(new maplibregl.NavigationControl({showCompass:false}), 'top-right');
+
+  const el=document.createElement('div');
+  el.className='pin show'; el.style.setProperty('--pin-color', CATS.friends.color);
+  el.innerHTML=`<div class="pill">Your pin</div>`;
+  miniMarker=new maplibregl.Marker({element:el, anchor:'center', draggable:true})
+    .setLngLat([recCoords?recCoords[1]:JOGJA.lon, recCoords?recCoords[0]:JOGJA.lat])
+    .addTo(miniMap);
+
+  const settle=lngLat=>setRecCoords([lngLat.lat, lngLat.lng], recPlaceInput.value.trim(), 'pin');
+  miniMarker.on('dragend', ()=>settle(miniMarker.getLngLat()));
+  miniMap.on('click', e=>{ miniMarker.setLngLat(e.lngLat); settle(e.lngLat); });
+}
+
+recPinToggle.addEventListener('click', ()=>{
+  const opening=recMini.hidden;
+  recMini.hidden=!opening;
+  recPinToggle.setAttribute('aria-expanded', String(opening));
+  if(!opening) return;
+  closeSuggest();
+  loadMapLibre(()=>{
+    if(!miniMap) initMini(); else { miniMap.resize(); centreMini(); }
+    requestAnimationFrame(()=>miniMap.resize());
+  });
+});
+
+/* ---- the sheet: post what guests send, pull back what's live ------------
+   Tips go up the moment they're sent, so the guide re-reads the sheet whenever
+   a guest comes back to the tab — a phone left open in a pocket catches up by
+   itself, without anyone thinking to pull-to-refresh. ---------------------- */
+let sharedSig='', lastPull=0;
+
+function loadSharedRecs(){
+  if(!REC_ENDPOINT) return;
+  lastPull=Date.now();
+  fetch(REC_ENDPOINT, {cache:'no-store'})
+    .then(r=>r.ok?r.json():null)
+    .then(rows=>{
+      if(!Array.isArray(rows)) return;
+      const sig=JSON.stringify(rows);
+      if(sig===sharedSig) return;      /* nothing new — don't disturb the view */
+      const first=!sharedSig;
+      sharedSig=sig;
+      SHARED=rows.filter(r=>r&&r.place).map(r=>({
+        id:r.id, by:r.by, place:r.place, why:r.why, url:r.url||'',
+        coords:(typeof r.lat==='number'&&typeof r.lng==='number'&&inJogja(r.lat,r.lng))?[r.lat,r.lng]:null
+      }));
+      refreshAll();
+      updateTabCounts();
+      /* Redrawing the rail sends it back to its first card, and re-framing the map
+         moves the ground under whoever is reading it. Both are fine when a guest
+         asked for them by switching tabs; neither is fine when the only thing that
+         happened is that somebody, somewhere else, added a tip. */
+      const keepScroll=cardsEl.scrollLeft;
+      renderCards(active);
+      if(!first) cardsEl.scrollLeft=keepScroll;
+      renderMarkers(active, {fit:first});
+    })
+    .catch(()=>{});   /* the sheet being unreachable must never cost the guide its map */
+}
+
+function refreshShared(){
+  if(document.visibilityState!=='visible') return;
+  if(Date.now()-lastPull < 20000) return;   /* a tab flicked back and forth is still one guest */
+  loadSharedRecs();
+}
+document.addEventListener('visibilitychange', refreshShared);
+addEventListener('focus', refreshShared);
+
+function postRec(rec){
+  if(!REC_ENDPOINT) return Promise.resolve(false);
+  /* text/plain keeps this a "simple" request, so the browser skips the preflight
+     OPTIONS that Apps Script cannot answer */
+  return fetch(REC_ENDPOINT,{
+    method:'POST', mode:'cors',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(rec)
+  }).then(r=>r.ok).catch(()=>false);
+}
+
+/* the way home when there's no sheet, or the sheet didn't answer. Takes the
+   whole rec, because by the time a failed POST comes back the form has been
+   reset and recCoords is null again. */
+function mailtoFor(rec){
+  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${rec.by}`);
+  const body=encodeURIComponent(`From: ${rec.by}\nPlace: ${rec.place}\nWhy we should try it:\n${rec.why}`+
+    (rec.url?`\nLink: ${rec.url}`:'')+
+    (rec.coords?`\nPinned at: ${rec.coords[0].toFixed(6)}, ${rec.coords[1].toFixed(6)}`:''));
+  return `mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}`;
 }
 
 recForm.addEventListener('submit', e=>{
@@ -1116,25 +2441,46 @@ recForm.addEventListener('submit', e=>{
   if(firstInvalid){ firstInvalid.focus(); return; }
 
   if(by && !store.name){ store.name=by; personalize(); }
-  const rec={ t:Date.now(), by, place, why, coords:null };
+  const url=safeUrl(recLinkInput.value.trim());
+  const hp=document.getElementById('rec-web').value;
+  const rec={ t:Date.now(), by, place, why, url, coords:recCoords, hp };
   store.recs=store.recs.concat([rec]);
   refreshAll();
   updateTabCounts();
   if(active==='friends'||active==='all'){ renderCards(active); renderMarkers(active); }
-  geocodeRec(rec);
 
-  const subject=encodeURIComponent(`Our Yogyakarta — a recommendation from ${by}`);
-  const body=encodeURIComponent(`From: ${by}\nPlace: ${place}\nWhy we should try it:\n${why}`);
-  recStatus.innerHTML=`Terima kasih, ${by}! Your tip is saved on this device and now lives under <b>From Friends</b> on the map.<br>`+
-    `<a class="link-u" href="mailto:lucas.aji08@gmail.com?subject=${subject}&body=${body}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
-    `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  /* it shows on their own map either way; the sheet is what carries it to
+     everyone else, and it goes up the moment it lands */
+  const pinned = recCoords
+    ? `Your tip is pinned under <b>From Friends</b> on the map.`
+    : `Your tip is on the map under <b>From Friends</b> — without a pin, so we'll place it ourselves.`;
+
+  if(REC_ENDPOINT){
+    recStatus.innerHTML=`Terima kasih, ${esc(by)}! Sending it over…`;
+    postRec(rec).then(ok=>{
+      recStatus.innerHTML = ok
+        ? `Terima kasih, ${esc(by)}! ${pinned} Every other guest can see it now too.`
+        : `Terima kasih, ${esc(by)}! ${pinned}<br>`+
+          `<a class="link-u" href="${mailtoFor(rec)}">It didn't reach us though — send it by email instead <span>&rarr;</span></a>`;
+    });
+  } else {
+    recStatus.innerHTML=`Terima kasih, ${esc(by)}! ${pinned}<br>`+
+      `<a class="link-u" href="${mailtoFor(rec)}">Now email it to Hilga &amp; Lucas <span>&rarr;</span></a><br>`+
+      `<small>(the email step is what actually reaches us — this guide has no server of its own)</small>`;
+  }
+
   recForm.reset();
+  setRecCoords(null,'','');
+  closeSuggest();
+  recMini.hidden=true;
+  recPinToggle.setAttribute('aria-expanded','false');
   if(store.name) recByInput.value=store.name;
 });
 
 addEventListener('load', ()=>{
   renderCards(active);
   mapObserver.observe(document.querySelector('.map-shell'));
+  loadSharedRecs();
 
   /* PWA: register the service worker (relative path keeps scope at this folder,
      so it works on a domain root or a GitHub Pages project subpath). Only runs
