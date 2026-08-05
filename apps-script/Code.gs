@@ -1,18 +1,20 @@
 /**
  * Our Yogyakarta — the shelf where friends' recommendations live.
  *
- * A Google Sheet is the whole database and the whole moderation queue: guests
- * POST a tip, it lands as a row, and nothing reaches the map until you type a
- * "y" in the Approved column. Free, no card, no server.
+ * A Google Sheet is the whole database: guests POST a tip, it lands as a row,
+ * and it is live on everyone's map straight away. Free, no card, no server.
+ *
+ * Nothing is waiting on you — the Hidden column is a brake, not a gate. Type
+ * "y" against a row and it leaves the map; leave it empty and the tip stands.
  *
  * Setup lives in README.md next door.
  *
  * Columns, in order — the header row is written for you on first run:
- *   A Received   B Approved   C Id   D Name   E Place   F Why   G Link   H Lat   I Lng
+ *   A Received   B Hidden   C Id   D Name   E Place   F Why   G Link   H Lat   I Lng
  */
 
 var SHEET_NAME = 'Recommendations';
-var HEADERS = ['Received','Approved','Id','Name','Place','Why','Link','Lat','Lng'];
+var HEADERS = ['Received','Hidden','Id','Name','Place','Why','Link','Lat','Lng'];
 
 /* Yogyakarta and its ring of regencies — the same box the guide checks against,
    so a pin can never arrive from the other side of the world. */
@@ -40,9 +42,9 @@ function str_(v, max) {
 }
 
 /**
- * GET — every approved row, as JSON, for the guide to draw.
- * Only the columns the map actually needs go out: no timestamps, and no rows
- * you haven't blessed.
+ * GET — every visible row, as JSON, for the guide to draw.
+ * Only the columns the map actually needs go out: no timestamps, no e-mail
+ * addresses, and nothing you've struck out.
  */
 function doGet() {
   var sh = sheet_();
@@ -53,8 +55,8 @@ function doGet() {
   var out = [];
 
   rows.forEach(function (r) {
-    var approved = String(r[1]).trim().toLowerCase();
-    if (approved !== 'y' && approved !== 'yes' && approved !== 'true' && r[1] !== true) return;
+    var hidden = String(r[1]).trim().toLowerCase();
+    if (hidden === 'y' || hidden === 'yes' || hidden === 'true' || r[1] === true) return;
     if (!String(r[4]).trim()) return;
 
     var lat = parseFloat(r[7]), lng = parseFloat(r[8]);
@@ -81,13 +83,20 @@ function doGet() {
  * a simple request and skips the CORS preflight, which Apps Script can't answer.
  *
  * Everything is clamped and re-typed here rather than trusted: this endpoint is
- * open to anyone who has the URL.
+ * open to anyone who has the URL, and a tip now goes live the moment it lands.
  */
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) return json_({ ok:false, error:'empty' });
 
     var body = JSON.parse(e.postData.contents);
+
+    /* The form carries a field no human can see. A person leaves it empty; the
+       kind of bot that scrapes endpoints out of page source fills everything in.
+       Answer it "ok" and write nothing, so whatever is on the other end has no
+       reason to try again. */
+    if (str_(body.hp, 200)) return json_({ ok:true });
+
     var place = str_(body.place, 120);
     if (!place) return json_({ ok:false, error:'no place' });
 
@@ -109,7 +118,7 @@ function doPost(e) {
     try {
       sheet_().appendRow([
         new Date(),
-        '',                      /* Approved — yours to fill in */
+        '',                      /* Hidden — empty means live; "y" takes it down */
         str_(body.t, 40),
         str_(body.by, 80),
         place,

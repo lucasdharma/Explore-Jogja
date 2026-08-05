@@ -652,6 +652,9 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .rec-mini{margin-top:12px}
 .rec-mini-map{height:230px; border:1px solid var(--line-2); background:var(--surface-2)}
 .rec-mini-hint{margin-top:8px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
+/* a field only a robot would fill in — off-screen rather than display:none, which
+   the better-written bots know to skip */
+.rec-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
 .rec-submit{display:inline-flex; align-items:center; min-height:48px; padding:14px 30px; cursor:pointer;
   font-family:var(--sans); font-size:12px; letter-spacing:.2em; text-transform:uppercase;
   background:var(--ink); color:var(--surface); border:1px solid var(--ink); transition:background .3s}
@@ -839,6 +842,10 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
           <input id="rec-link" name="link" type="url" inputmode="url" autocomplete="off"
                  placeholder="Paste one and the directions button goes straight there" />
         </div>
+        <div class="rec-hp" aria-hidden="true">
+          <label for="rec-web">Leave this field empty</label>
+          <input id="rec-web" name="website" type="text" tabindex="-1" autocomplete="off" />
+        </div>
         <button type="submit" class="rec-submit">Add your recommendation</button>
         <p class="rec-status" id="rec-status" aria-live="polite"></p>
       </form>
@@ -890,12 +897,15 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    ============================================================ */
 
 /* ---- the shared shelf for friends' tips ----------------------------------
-   Paste the /exec URL of the Apps Script deployment here and every guest's
-   recommendation is posted to your Google Sheet, and every row you tick as
-   approved comes back down onto everyone's map. apps-script/README.md walks
-   through the five minutes of setup. Leave it empty and the guide still
-   works exactly as before: tips live on the guest's own device and reach you
-   by email, they just don't reach each other. ------------------------------ */
+   Paste the /exec URL of the Apps Script deployment here and a guest's
+   recommendation is written to your Google Sheet and read back onto every
+   other guest's map, on whatever device they're holding. Take a row down by
+   typing "y" in its Hidden column. apps-script/README.md walks through the
+   five minutes of setup.
+
+   LEAVE THIS EMPTY AND NOTHING IS SHARED: tips stay in the browser that wrote
+   them — a phone and a laptop are two different islands — and reach you only
+   by the email link. That is the fallback, not the feature. ---------------- */
 const REC_ENDPOINT = '';
 
 /* guest identity + their recommendations, remembered on this device */
@@ -1931,7 +1941,8 @@ function legendFor(cat, n){
   return `${n} ${CATS[cat].label} spots we love`;
 }
 
-function renderMarkers(cat){
+function renderMarkers(cat, opts){
+  const fit = !opts || opts.fit !== false;
   const list=placesFor(cat);
   legendEl.textContent = legendFor(cat, list.length);
   if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
@@ -1958,7 +1969,7 @@ function renderMarkers(cat){
   /* frame the chosen category only — the always-on wedding pins must not drag the
      viewport 15km north every time you filter for coffee in the centre */
   const locs=list.filter(p=>p.coords);
-  if(locs.length){
+  if(locs.length && fit){
     const b=new maplibregl.LngLatBounds();
     locs.forEach(p=>b.extend(lngLat(p)));
     map.fitBounds(b, {padding:{top:80,bottom:80,left:70,right:70}, maxZoom:13.5, duration:800});
@@ -2351,24 +2362,48 @@ recPinToggle.addEventListener('click', ()=>{
   });
 });
 
-/* ---- the sheet: post what guests send, pull back what you've approved ---- */
+/* ---- the sheet: post what guests send, pull back what's live ------------
+   Tips go up the moment they're sent, so the guide re-reads the sheet whenever
+   a guest comes back to the tab — a phone left open in a pocket catches up by
+   itself, without anyone thinking to pull-to-refresh. ---------------------- */
+let sharedSig='', lastPull=0;
+
 function loadSharedRecs(){
   if(!REC_ENDPOINT) return;
-  fetch(REC_ENDPOINT)
+  lastPull=Date.now();
+  fetch(REC_ENDPOINT, {cache:'no-store'})
     .then(r=>r.ok?r.json():null)
     .then(rows=>{
-      if(!Array.isArray(rows)||!rows.length) return;
+      if(!Array.isArray(rows)) return;
+      const sig=JSON.stringify(rows);
+      if(sig===sharedSig) return;      /* nothing new — don't disturb the view */
+      const first=!sharedSig;
+      sharedSig=sig;
       SHARED=rows.filter(r=>r&&r.place).map(r=>({
         id:r.id, by:r.by, place:r.place, why:r.why, url:r.url||'',
         coords:(typeof r.lat==='number'&&typeof r.lng==='number'&&inJogja(r.lat,r.lng))?[r.lat,r.lng]:null
       }));
       refreshAll();
       updateTabCounts();
+      /* Redrawing the rail sends it back to its first card, and re-framing the map
+         moves the ground under whoever is reading it. Both are fine when a guest
+         asked for them by switching tabs; neither is fine when the only thing that
+         happened is that somebody, somewhere else, added a tip. */
+      const keepScroll=cardsEl.scrollLeft;
       renderCards(active);
-      renderMarkers(active);
+      if(!first) cardsEl.scrollLeft=keepScroll;
+      renderMarkers(active, {fit:first});
     })
     .catch(()=>{});   /* the sheet being unreachable must never cost the guide its map */
 }
+
+function refreshShared(){
+  if(document.visibilityState!=='visible') return;
+  if(Date.now()-lastPull < 20000) return;   /* a tab flicked back and forth is still one guest */
+  loadSharedRecs();
+}
+document.addEventListener('visibilitychange', refreshShared);
+addEventListener('focus', refreshShared);
 
 function postRec(rec){
   if(!REC_ENDPOINT) return Promise.resolve(false);
@@ -2407,14 +2442,15 @@ recForm.addEventListener('submit', e=>{
 
   if(by && !store.name){ store.name=by; personalize(); }
   const url=safeUrl(recLinkInput.value.trim());
-  const rec={ t:Date.now(), by, place, why, url, coords:recCoords };
+  const hp=document.getElementById('rec-web').value;
+  const rec={ t:Date.now(), by, place, why, url, coords:recCoords, hp };
   store.recs=store.recs.concat([rec]);
   refreshAll();
   updateTabCounts();
   if(active==='friends'||active==='all'){ renderCards(active); renderMarkers(active); }
 
   /* it shows on their own map either way; the sheet is what carries it to
-     everyone else, once you've approved the row */
+     everyone else, and it goes up the moment it lands */
   const pinned = recCoords
     ? `Your tip is pinned under <b>From Friends</b> on the map.`
     : `Your tip is on the map under <b>From Friends</b> — without a pin, so we'll place it ourselves.`;
@@ -2423,7 +2459,7 @@ recForm.addEventListener('submit', e=>{
     recStatus.innerHTML=`Terima kasih, ${esc(by)}! Sending it over…`;
     postRec(rec).then(ok=>{
       recStatus.innerHTML = ok
-        ? `Terima kasih, ${esc(by)}! ${pinned} It's with Hilga &amp; Lucas now — once they've read it, every other guest sees it too.`
+        ? `Terima kasih, ${esc(by)}! ${pinned} Every other guest can see it now too.`
         : `Terima kasih, ${esc(by)}! ${pinned}<br>`+
           `<a class="link-u" href="${mailtoFor(rec)}">It didn't reach us though — send it by email instead <span>&rarr;</span></a>`;
     });
