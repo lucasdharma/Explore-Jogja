@@ -1483,6 +1483,9 @@ const PLACES = [
   /* THE WEDDING — the two fixed points of the whole guide. These render on the map
      under every filter, not just their own tab (see renderMarkers). */
   { category:"wedding", name:"Wyndham Garden Yogyakarta", img:"assets/places/wyndham.jpg", area:"Jl. Magelang KM 14 · Sleman", coords:[-7.6834,110.3479] /* APPROX */,
+    /* a tall portrait: centred, the 4:3 card keeps the pool and loses the roof's apex
+       entirely. Pulled up so the whole A-frame reads, ridge to eaves. */
+    focus:"50% 4%",
     url:"https://maps.app.goo.gl/Kz4F5Mz2T4vXehVRA",
     blurb:"Where we say the toast — the reception.",
     story:"Our reception. A garden hotel out on Jl. Magelang, a good half hour north of the city centre, with room for all of us and a conference hall that will be unrecognisable by the evening.",
@@ -1717,7 +1720,10 @@ function renderCards(cat){
     card.className='card' + (p.category==='wedding'?' card-wedding':''); card.dataset.idx=p._i;
     card.tabIndex=0; card.setAttribute('role','button');
     card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}${p.fav?', one of our favourites':''}`);
-    const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async">` : ``;
+    /* Cards are 4:3 and the photos are not, so object-fit:cover crops them — a tall
+       portrait loses half its height, taken from the middle by default. `focus` moves
+       that window when the subject is not in the centre of the frame. */
+    const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async"${p.focus?` style="object-position:${p.focus}"`:``}>` : ``;
     card.innerHTML=`
       <div class="c-img" style="--g:${gradFor(p.name)}">${img}</div>
       <span class="c-cat">${p.fav?`<span class="c-fav" aria-hidden="true">&#9733;</span>`:``}<span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
