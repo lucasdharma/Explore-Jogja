@@ -1446,20 +1446,27 @@ const CHIME_TUNE = {
    Coordinates marked APPROX were placed from the street address rather than read off
    Google Maps, so the pin may sit a short way from the door — the `url` link is exact
    either way. Replace them by right-clicking the place in Google Maps and copying the
-   lat/long at the top of the menu. */
+   lat/long at the top of the menu.
+
+   The two wedding pins are APPROX but not guesses: both roads number their addresses in
+   kilometres, so each was triangulated along its road from a fixed point. The church sits
+   0.5km past Kopi Bukan Luwak (Jl. Kaliurang KM 16.5, below) on a bearing taken from that
+   entry and Bloomery's; the hotel sits 8km past JCM (Jl. Magelang KM 6, near Golden Geisha
+   below), which independently agrees with the 12km-from-Tugu distance the hotel publishes.
+   Both should be good to a few hundred metres. */
 const PLACES = [
   /* THE WEDDING — the two fixed points of the whole guide. These render on the map
      under every filter, not just their own tab (see renderMarkers). */
-  { category:"wedding", name:"Wyndham Garden Yogyakarta", area:"Jl. Magelang KM 14 · Sleman", coords:[-7.7009,110.3462] /* APPROX */,
+  { category:"wedding", name:"Wyndham Garden Yogyakarta", area:"Jl. Magelang KM 14 · Sleman", coords:[-7.6834,110.3479] /* APPROX */,
     url:"https://maps.app.goo.gl/Kz4F5Mz2T4vXehVRA",
     blurb:"Where we say the toast — the reception.",
-    story:"Our reception. A garden hotel out on Jl. Magelang, about forty minutes north of the city centre, with room for all of us and a conference hall that will be unrecognisable by the evening.",
+    story:"Our reception. A garden hotel out on Jl. Magelang, a good half hour north of the city centre, with room for all of us and a conference hall that will be unrecognisable by the evening.",
     note:"Give yourself an hour from the centre in the late afternoon — Jl. Magelang is slow at rush hour. There are rooms here if you would rather not drive back." },
-  { category:"wedding", name:"Church Matrimony", area:"Yogyakarta", coords:null /* TODO: coordinates + the church's actual name */,
-    url:"https://maps.app.goo.gl/9B9aztU1wKbjVtH2A",
+  { category:"wedding", name:"Gereja Santa Maria Assumpta", area:"Jl. Kaliurang KM 17 · Pakem", coords:[-7.6664,110.4212] /* APPROX */,
+    url:"https://maps.app.goo.gl/thJ8sxDf5aL9yp5W9",
     blurb:"Where we say the vows — the matrimony.",
-    story:"The matrimony, earlier in the day, before everyone moves on to the reception. Come a little early: we would rather see you before the aisle than after it.",
-    note:"Tap “Get directions” for the exact church — the pin is still being placed." },
+    story:"Our matrimony. The parish church at Pakem, up Jl. Kaliurang on the road to Merapi — a plain, quiet building from 1956 with the Sumur Kitiran Mas in its grounds, and noticeably cooler air than the city. Kopi Bukan Luwak, further down this page, is barely ten minutes further up the same road.",
+    note:"Leave early — it is a good forty minutes north of the centre. From here it is roughly half an hour west across to the reception." },
 
   /* COFFEE */
   { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203], fav:true,
