@@ -83,14 +83,21 @@ coordinates to copy them, and paste them into Lat and Lng.
 Test tips are live the moment you send them, so do your testing before you hand
 the link round, and clean up in both places when you're done:
 
-1. **The sheet** — delete the test rows, or type `y` in Hidden.
+1. **The sheet** — delete the test rows (from row 2 down, keeping the header
+   row), or type `y` in Hidden.
 2. **Your own browser** — this is the one people forget. Your submissions are
-   also cached on your own device and show up regardless of the sheet, so run
-   this in the browser console on the site:
+   also cached on your own device and show up regardless of the sheet. Open the
+   guide with `?reset` on the end of the address and it forgets them:
 
-   ```js
-   localStorage.clear(); location.reload();
    ```
+   https://<your-pages-url>/?reset
+   ```
+
+   That clears this browser's tips and the name it was greeted by, nothing else
+   — the sheet isn't touched and no other guest loses anything. You'll get the
+   welcome dialog back, which is how you know it worked. It's the only way to do
+   this on a phone, where there's no console; on a laptop
+   `localStorage.clear(); location.reload()` does the same thing.
 
 To see exactly what a guest receives, open your `/exec` URL in a browser tab —
 that JSON array *is* the shared data, and nothing else reaches anyone. Then open

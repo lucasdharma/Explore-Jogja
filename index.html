@@ -929,6 +929,31 @@ const store = {
   set recs(v){ this.write('oy_recs', JSON.stringify(v)); }
 };
 
+/* ---- ?reset — hand this device back its first visit -----------------------
+   Everything above lives in localStorage, which a phone gives you no way to
+   clear without going spelunking in browser settings. Opening the guide with
+   ?reset on the end forgets this browser's tips and the name it was greeted
+   by, and nothing else: the sheet is untouched, so no other guest loses a
+   thing, and whoever runs it simply gets the welcome dialog again — which is
+   also the only confirmation it needs to give.
+
+   It runs here, above everything that reads the store, so the page is built
+   from the cleared state and there is no reload and no flash of the old one.
+   The parameter is then taken off the address bar, so a refresh doesn't
+   quietly wipe the name they have only just typed in. Keys are found by their
+   oy_ prefix rather than listed, so this keeps working if we store more. ---- */
+if(/[?&]reset\b/.test(location.search)){
+  try{
+    const stale=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.indexOf('oy_')===0) stale.push(k);
+    }
+    stale.forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  try{ history.replaceState(null, '', location.pathname + location.hash); }catch(e){}
+}
+
 let CHIME = null;
 
 /* ---- The doorway. A joglo roof hangs at the top of the frame and a curtain
