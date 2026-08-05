@@ -372,7 +372,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
    floated over the top of the map so filtering never means leaving the map
    (and stays available in fullscreen) */
 .tabs{position:absolute; z-index:6; top:16px; left:50%; transform:translateX(-50%);
-  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 660px);
+  display:inline-flex; align-items:center; gap:2px; max-width:min(calc(100% - 150px), 1120px);
   padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:999px;
   box-shadow:0 8px 28px rgba(40,36,30,.22);
   overflow-x:auto; scrollbar-width:none}
@@ -436,6 +436,33 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pin:hover .pill{transform:scale(1.06); box-shadow:0 5px 15px rgba(40,36,30,.3)}
 .pin:active .pill{transform:scale(.96)}
 .pin.active .pill{background:var(--ink); color:var(--surface); border-color:var(--ink); transform:scale(1.09); box-shadow:0 0 0 3px var(--pin-color, var(--ink)), 0 7px 20px rgba(40,36,30,.4)}
+/* a favourite keeps its category colour and earns a small star */
+.pin-star{color:var(--pin-color, var(--ink)); font-size:11px; margin-right:5px; vertical-align:1px}
+.pin.active .pin-star{color:#E5C687}
+
+/* ===== the wedding pins — deliberately not a pill =====
+   Everything else on this map is a cream pill in its category colour. The two
+   wedding places are ink plaques edged in gold, sitting above the rest, breathing
+   a slow gold halo. They stay lit while every other pin dims, because on a wedding
+   guide the venue is the one thing you should never have to hunt for. */
+.pin-wedding{z-index:5}
+.pin-wedding .pill{position:relative; background:var(--ink); color:#F6EEDD; border:1.5px solid #C9A76B; border-radius:3px;
+  padding:9px 15px 9px 12px; letter-spacing:.11em; text-transform:uppercase; font-size:10.5px; font-weight:400;
+  box-shadow:0 0 0 1px rgba(201,167,107,.35), 0 6px 18px rgba(40,36,30,.42)}
+.pin-wedding .pill::after{content:""; position:absolute; inset:3px; border:.5px solid rgba(201,167,107,.5); border-radius:1px; pointer-events:none}
+.pin-wedding .pin-rings{display:inline-flex; width:14px; height:14px; margin-right:7px; vertical-align:-3px; color:#D8B87C}
+.pin-wedding .pin-rings svg{width:100%; height:100%; display:block}
+.pin-wedding:hover .pill{transform:scale(1.05); box-shadow:0 0 0 1px rgba(201,167,107,.55), 0 9px 24px rgba(40,36,30,.5)}
+.pin-wedding.active .pill{background:#2B2924; color:#F6EEDD; border-color:#E5C687; transform:scale(1.08);
+  box-shadow:0 0 0 3px rgba(201,167,107,.55), 0 9px 26px rgba(40,36,30,.5)}
+/* the halo: a gold pulse that swells out along the plaque's own outline. Spread on a
+   throwaway ::before rather than on .pill itself, so the pill keeps its own shadow —
+   and its hover and active shadows — untouched. */
+.pin-wedding .pill::before{content:""; position:absolute; inset:0; border-radius:3px; pointer-events:none;
+  animation:weddingHalo 3.4s ease-out infinite}
+@keyframes weddingHalo{0%{box-shadow:0 0 0 0 rgba(201,167,107,.5)} 70%{box-shadow:0 0 0 13px rgba(201,167,107,0)} 100%{box-shadow:0 0 0 0 rgba(201,167,107,0)}}
+/* the venue never dims — that is the whole point of it */
+.pin.pin-wedding.dim{opacity:1}
 
 /* popup — mobile-first, viewport-relative so it always fits and scales with the
    page/orientation automatically (no JS resizing needed) */
@@ -452,6 +479,11 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .pop-tip .eyebrow{color:var(--muted)}
 .pop-tip .txt{font-family:var(--serif); font-style:italic; font-size:16.5px; line-height:1.45; margin-top:8px; color:var(--ink)}
 .pop-link{margin-top:18px}
+.pop-fav{display:inline-block; margin-top:9px; font-family:var(--sans); font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:#A85751}
+/* the wedding detail gets a gold rule under the name — the same gold as its pin */
+.pop-wedding{border-top:2px solid #C9A76B}
+.pop-wedding .eyebrow{color:#7E6437}
+.pop-wedding h3{font-style:italic}
 @media(min-width:760px){
   /* proportional to the window: ~22vw wide and ~36vh tall, clamped — resizing or
      zooming the browser rescales it instead of leaving a fixed oversized box */
@@ -504,6 +536,11 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
 .card .c-more{margin-top:18px}
 .card.active h4{text-decoration:underline; text-underline-offset:5px; text-decoration-thickness:1px}
+.c-fav{color:#A85751; margin-right:7px; font-size:11px; vertical-align:1px}
+/* the wedding cards carry the same gold rule the pins do, so the two read as one thing */
+.card-wedding .c-img{box-shadow:inset 0 0 0 2px #C9A76B}
+.card-wedding .c-cat{color:#7E6437; letter-spacing:.22em}
+.card-wedding h4{font-style:italic}
 
 /* ===== FOOTER / DETAILS ===== */
 .footer{padding:var(--section-gap) 0 90px; text-align:center; border-top:1px solid var(--line)}
@@ -647,7 +684,7 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
     <div class="ex-head reveal">
       <span class="eyebrow">The map</span>
       <h2>Where we eat, drink and linger</h2>
-      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot.</p>
+      <p class="lede">Choose a category, then explore directly on the map — drag to move, pinch or scroll to zoom. Tap any place to read why it earned its spot. The two gold plaques are the wedding itself; they stay on the map whatever you are browsing.</p>
     </div>
 
   </div>
@@ -1398,17 +1435,42 @@ const CHIME_TUNE = {
   CHIME = { brush, rest };
 })();
 
+/* `fav` marks a place as one of ours — Hilga & Lucas's own shortlist. It is a flag
+   rather than a category so a favourite keeps its real category colour on the pin
+   and still appears under Coffee, Slow Bar or Foodies as well as under Our Favourites.
+
+   `url` is the exact Google Maps link for a place. When present the popup's "Get
+   directions" uses it verbatim instead of falling back to a name search, so guests
+   always land on the right doorway even if the pin itself is a few metres out.
+
+   Coordinates marked APPROX were placed from the street address rather than read off
+   Google Maps, so the pin may sit a short way from the door — the `url` link is exact
+   either way. Replace them by right-clicking the place in Google Maps and copying the
+   lat/long at the top of the menu. */
 const PLACES = [
+  /* THE WEDDING — the two fixed points of the whole guide. These render on the map
+     under every filter, not just their own tab (see renderMarkers). */
+  { category:"wedding", name:"Wyndham Garden Yogyakarta", area:"Jl. Magelang KM 14 · Sleman", coords:[-7.7009,110.3462] /* APPROX */,
+    url:"https://maps.app.goo.gl/Kz4F5Mz2T4vXehVRA",
+    blurb:"Where we say the toast — the reception.",
+    story:"Our reception. A garden hotel out on Jl. Magelang, about forty minutes north of the city centre, with room for all of us and a conference hall that will be unrecognisable by the evening.",
+    note:"Give yourself an hour from the centre in the late afternoon — Jl. Magelang is slow at rush hour. There are rooms here if you would rather not drive back." },
+  { category:"wedding", name:"Church Matrimony", area:"Yogyakarta", coords:null /* TODO: coordinates + the church's actual name */,
+    url:"https://maps.app.goo.gl/9B9aztU1wKbjVtH2A",
+    blurb:"Where we say the vows — the matrimony.",
+    story:"The matrimony, earlier in the day, before everyone moves on to the reception. Come a little early: we would rather see you before the aisle than after it.",
+    note:"Tap “Get directions” for the exact church — the pin is still being placed." },
+
   /* COFFEE */
-  { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203],
+  { category:"coffee", name:"Couvee", img:"assets/places/couvee.jpg", area:"Sagan", coords:[-7.7811167,110.3775203], fav:true,
     blurb:"A buzzy all-day cafe — and very good matcha.",
     story:"A local favourite with branches across the city: generous indoor and outdoor seating, arabica coffee, pastries and rice bowls. Easy to settle into for an hour or three.",
     note:"Order the matcha. Comfortable for working; busiest in the evenings." },
-  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164],
+  { category:"coffee", name:"Djaya Roasters", img:"assets/places/djaya-roasters.jpg", area:"Ngaglik · Sleman", coords:[-7.730434,110.3894164], fav:true,
     blurb:"A small roastery for people who take coffee seriously.",
     story:"A minimal, focused coffee bar and roastery with local, imported and exotic beans — strong on manual brews, and you can buy beans to take home.",
     note:"Ask for a manual brew and let the barista choose the bean. Free parking." },
-  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906],
+  { category:"coffee", name:"Suara Dewandaru", img:"assets/places/suara-dewandaru.jpg", area:"Cangkringan · Kaliurang", coords:[-7.6379278,110.4390906], fav:true,
     blurb:"A bamboo-forest cafe with vinyl, jazz and mocktails.",
     story:"Tucked into the cooler hills north of the city, ringed by bamboo, with a vinyl soundtrack and a menu of coffee and mocktails. Peaceful, a little remote, lovely by daylight.",
     note:"The Mocktail Dewandaru is the one. The lane in is narrow — come before dusk." },
@@ -1432,6 +1494,21 @@ const PLACES = [
     blurb:"A 24-hour, matcha-forward social space.",
     story:"A spacious, 24-hour cafe built for working, meeting or a late sit-down, with a serious matcha menu and indoor/outdoor seating.",
     note:"The ceremonial matcha latte; ask for less sugar if you like it grassy." },
+  { category:"coffee", name:"Chéri Patisserie & Brasserie", area:"Kranggan · Cokrodiningratan", coords:[-7.7800,110.3654] /* APPROX */,
+    url:"https://maps.app.goo.gl/DjxjJGn878tQmTAT7",
+    blurb:"A proper French patisserie, ten minutes from Tugu.",
+    story:"A patisserie and brasserie on Jl. Kranggan doing the French things properly — laminated pastry, tarts, a full brasserie menu — in a bright room just north of Tugu. Open from breakfast until late.",
+    note:"Come for the viennoiserie in the morning, before the counter is picked over." },
+  { category:"coffee", name:"Estuary Café", area:"Gemawang · Sinduadi", coords:[-7.7477,110.3737] /* APPROX */,
+    url:"https://maps.app.goo.gl/49mtrK2F6vvqkhot8",
+    blurb:"Concrete, greenery and the Code river below.",
+    story:"Hidden down a gang off Jl. Monjali and built out over the bank of Kali Code: an industrial, concrete-finish room that opens onto trees and river. Far greener and quieter than the address suggests.",
+    note:"Ask for a table on the river side. The lane in is narrow — go slowly, it is worth it." },
+  { category:"coffee", name:"99 Coffee Roaster", area:"Gejayan · Jl. Affandi", coords:[-7.7604,110.3900] /* APPROX */,
+    url:"https://maps.app.goo.gl/aWmSsbeYooYKPDCT6",
+    blurb:"A big, easy roastery on Gejayan, open from six.",
+    story:"The Gejayan branch of a local roastery — generous, high-ceilinged, and busy from early morning until midnight, with their own beans, a full kitchen and enough space to actually get something done.",
+    note:"Opens at 6am, which makes it the best jet-lag breakfast in the city." },
 
   /* SLOW BAR */
   { category:"slowbar", name:"TUSEN", img:"assets/places/tusen.jpg", area:"Kotabaru", coords:[-7.7857793,110.3707008],
@@ -1446,9 +1523,14 @@ const PLACES = [
     blurb:"A big, leafy resto-bar — pool, live music, the works.",
     story:"A spacious restaurant and bar with indoor and outdoor areas, a pool, live music, a bakery and gelato stand, and a wide menu from pizza and pasta to local dishes, cocktails and wine.",
     note:"Great for a relaxed group evening. Note the tax and service charge." },
+  { category:"slowbar", name:"Sakapatat Social House & Resto", area:"Pakuningratan · Jetis", coords:[-7.7793,110.3671] /* APPROX */,
+    url:"https://maps.app.goo.gl/jvjaePg7x9tdWazu5",
+    blurb:"An old house, a vintage room, and thirty-odd beers.",
+    story:"A social house set in a lovely old Jetis home — heavy timber, vintage fittings, a courtyard — with the widest beer list in the city, local and imported, and a western kitchen to go with it.",
+    note:"Sit in the courtyard. Open until 1am, and 2am at weekends." },
 
   /* FOOD */
-  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439],
+  { category:"food", name:"Sate Klathak Pak Pong", img:"assets/places/sate-klathak-pak-pong.jpg", area:"Wonokromo · Bantul", coords:[-7.8715464,110.3874439], fav:true,
     blurb:"The legendary goat sate grilled on iron spokes.",
     story:"Perhaps Jogja's most famous sate klathak: chunks of goat seasoned simply with salt, grilled on iron bicycle spokes, served with a warm curry broth. Worth the trip out to Bantul.",
     note:"Don't skip the gulai. It's a 25–30 minute drive south of the centre." },
@@ -1464,7 +1546,7 @@ const PLACES = [
     blurb:"Arguably the best ramen in the city.",
     story:"A hugely popular Japanese ramen spot on Jl. Magelang, known for rich broths and tender wagyu and saikoro beef. Expect a queue.",
     note:"The Saikoro and Wagyu Baitan are the bestsellers — arrive early or reserve." },
-  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686],
+  { category:"food", name:"Ayam Geprek Bu Made", img:"assets/places/ayam-geprek-bu-made.jpg", area:"Papringan · Caturtunggal", coords:[-7.7763154,110.3953686], fav:true,
     blurb:"Smashed fried chicken with a serious sambal.",
     story:"A beloved blue-tent warung where they truly geprek the chicken — crisp, tender, then smashed with a punchy sambal bawang. Pick your pieces and chilli level at the counter.",
     note:"The sambal is no joke — ask for fewer chillies if unsure. Don't miss the tongseng." },
@@ -1476,15 +1558,15 @@ const PLACES = [
     blurb:"Authentic Balinese nasi campur (pork / non-halal).",
     story:"Some of the best Balinese food in Jogja — bold, spicy nasi campur babi with tender pork and proper sambal. A taste of Bali east of the city. Closed Mondays.",
     note:"The nasi campur and babi goreng. There's a special menu on Sundays." },
-  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656],
+  { category:"food", name:"Bubur Yoyong", img:"assets/places/bubur-yoyong.jpg", area:"Jl. Magelang · Jetis", coords:[-7.7816303,110.3605656], fav:true,
     blurb:"Chinese-style morning porridge with stir-fried toppings.",
     story:"A long-running breakfast spot serving light, well-seasoned porridge with unusual stir-fried toppings, plus nasi gongso and Hainan fried rice. Mornings only, closed Sundays.",
     note:"A great early breakfast — try the nasi gongso and add cakwe." },
-  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081],
+  { category:"food", name:"Tio Ciu Bang Sinyo", img:"assets/places/tio-ciu-bang-sinyo.jpg", area:"Mrican · Caturtunggal", coords:[-7.7762845,110.3905081], fav:true,
     blurb:"Generous, comforting Teochew-style Chinese food.",
     story:"A long-time student favourite near Mrican: big portions of Teochew-Chinese cooking at gentle prices — five-spice ngohyang chicken, kangkung hotplate, seafood hotplate.",
     note:"The ngohyang chicken and a hotplate. Cheap, fast, always packed." },
-  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777],
+  { category:"food", name:"Mie Sapi Banteng", img:"assets/places/mie-sapi-banteng.jpg", area:"Banteng · Ngaglik", coords:[-7.7343041,110.3901777], fav:true,
     blurb:"Springy beef noodles — and the best wontons.",
     story:"A noodle shop known for thin, springy beef noodles and outstanding pangsit (wontons), both fried and boiled. Closed Thursdays and Sundays.",
     note:"Order both the boiled and fried pangsit. Lunchtime only." },
@@ -1492,10 +1574,25 @@ const PLACES = [
     blurb:"Tender pork sate in a leafy, tucked-away spot (non-halal).",
     story:"A Chinese-Indonesian pork specialist set among trees inside the Puskat compound: juicy grilled sate babi, rich babi kecap and pork bakso.",
     note:"The sate babi and babi kecap. A calm, green setting." },
-  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610],
+  { category:"food", name:"Bakmi Jawa Mas Timbul", img:"assets/places/bakmi-jawa-mas-timbul.jpg", area:"Kricak · Mlati", coords:[-7.7691871,110.3563610], fav:true,
     blurb:"Charcoal-cooked Javanese noodles, late into the night.",
     story:"Authentic bakmi Jawa cooked over a charcoal fire — smoky bakmi godog and goreng, ayam rica, magelangan — in a warm, traditional room with an angkringan section. Open till 2am.",
     note:"Bakmi godog over charcoal is the classic. One portion is never enough." },
+  { category:"food", name:"Mediterranea Restaurant", area:"Tirtodipuran · Mantrijeron", coords:[-7.8174,110.3633] /* APPROX */, fav:true,
+    url:"https://maps.app.goo.gl/JiDgL5m2TkAcZ3g9A",
+    blurb:"Chef Kamil's French kitchen, and our own favourite.",
+    story:"A French and Mediterranean kitchen on Jl. Tirtodipuran, run by Chef Kamil since 2012 and cooked fresh each day. The room everyone in Jogja goes to when they want a night off Indonesian food — and the one we keep coming back to.",
+    note:"Book ahead, it fills every night. Breakfast from 8am is the quiet secret." },
+  { category:"food", name:"Masama by Kamil", area:"Tirtodipuran · Mantrijeron", coords:[-7.8174,110.3636] /* APPROX */,
+    url:"https://maps.app.goo.gl/G2BPWgktf3x7koCp6",
+    blurb:"Mediterranea's younger sibling, next door.",
+    story:"Chef Kamil's second room, literally next door to Mediterranea: western cooking with an Asian hand, lighter and more playful than the original — the duck sate is the dish people come back for.",
+    note:"If Mediterranea is full, walk one door up. The sate bebek is the order." },
+  { category:"food", name:"Kim's Bar & Kitchen", area:"Randugowang · Sendangadi", coords:[-7.7419,110.3662] /* APPROX */,
+    url:"https://maps.app.goo.gl/CBp65uUeimsfy3xC7",
+    blurb:"A tropical, Bali-ish garden room out north.",
+    story:"An open-air bar and kitchen up in Mlati with a tropical-modern feel — timber, earth tones, a lot of plants — serving Japanese and western plates, pizza and steak, with a proper drinks list.",
+    note:"Best at sunset, outdoors. Easy parking, unlike anywhere in the centre." },
 ];
 
 /* color = accent used on pins/card dots (light, decorative). active = darker shade used behind
@@ -1503,6 +1600,12 @@ const PLACES = [
 const CATS = {
   all:     { label:"All",      color:null,      active:null,
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.3"/><path d="M14.6 9.4 12.9 12.9 9.4 14.6 11.1 11.1Z"/></svg>` },
+  wedding: { label:"The Wedding", color:"#B08D57", active:"#7E6437",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.1" cy="14.6" r="5"/><circle cx="14.9" cy="14.6" r="5"/><path d="M12 3.6 13.9 6.1h-3.8Z"/></svg>` },
+  /* `rail` is the heading over the card rail, where there is room for the warmer,
+     longer name the cramped tab strip cannot carry. */
+  favourites: { label:"Favourites", rail:"Our Favourites", color:"#A85751", active:"#87413C",
+    icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3.7 2.55 5.4 5.75.85-4.15 4.2.98 5.98L12 17.3l-5.13 2.83.98-5.98-4.15-4.2 5.75-.85Z"/></svg>` },
   coffee:  { label:"Coffee",   color:"#A67C52", active:"#7A5A3D",
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9h11v5.5A4.5 4.5 0 0 1 11.5 19h-2A4.5 4.5 0 0 1 5 14.5Z"/><path d="M16 10.3h1.3a2.2 2.2 0 1 1 0 4.4H16"/><path d="M8.6 4.3c-.6.7-.6 1.3 0 2M12 4.3c-.6.7-.6 1.3 0 2"/></svg>` },
   slowbar: { label:"Slow Bar", color:"#6E4A5E", active:"#5C3B49",
@@ -1512,7 +1615,10 @@ const CATS = {
   friends: { label:"From Friends", color:"#5B7C99", active:"#48627A",
     icon:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5C7.7 16.1 4.7 13 4.7 9.9 4.7 7.5 6.5 5.7 8.7 5.7c1.3 0 2.5.6 3.3 1.7.8-1.1 2-1.7 3.3-1.7 2.2 0 4 1.8 4 4.2 0 3.1-3 6.2-7.3 9.6Z"/></svg>` }
 };
-const ORDER = ["all","coffee","slowbar","food","friends"];
+const ORDER = ["all","wedding","favourites","coffee","slowbar","food","friends"];
+
+/* "Our Favourites" is a flag, not a category — every other tab matches on category. */
+const matchesCat = (p,cat) => cat==='all' ? true : cat==='favourites' ? !!p.fav : p.category===cat;
 
 /* merged data: curated PLACES + this guest's own recommendations */
 let ALL = [];
@@ -1547,7 +1653,7 @@ const highlightEl=document.createElement('span');
 highlightEl.className='tab-highlight'; highlightEl.setAttribute('aria-hidden','true');
 switchEl.appendChild(highlightEl);
 
-const countFor = key => key==='all' ? ALL.length : ALL.filter(p=>p.category===key).length;
+const countFor = key => ALL.filter(p=>matchesCat(p,key)).length;
 function updateTabCounts(){
   [...switchEl.querySelectorAll('.tab')].forEach(b=>{ b.querySelector('.num').textContent = countFor(b.dataset.cat); });
   requestAnimationFrame(moveHighlight);   /* counts can change tab widths */
@@ -1572,7 +1678,7 @@ function moveHighlight(){
 }
 requestAnimationFrame(moveHighlight);
 
-const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=> cat==='all' ? true : p.category===cat);
+const placesFor = cat => ALL.map((p,i)=>({...p,_i:i})).filter(p=>matchesCat(p,cat));
 const cardFor = idx => [...cardsEl.children].find(c=>+c.dataset.idx===idx);
 const pinFor  = idx => { const m=markers.find(x=>x.idx===idx); return m? m.el : null; };
 const lngLat  = p => [p.coords[1], p.coords[0]];   /* MapLibre uses [lng, lat] */
@@ -1581,12 +1687,13 @@ function renderCards(cat){
   cardsEl.innerHTML='';
   placesFor(cat).forEach(p=>{
     const card=document.createElement('article');
-    card.className='card'; card.dataset.idx=p._i;
-    card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}`);
+    card.className='card' + (p.category==='wedding'?' card-wedding':''); card.dataset.idx=p._i;
+    card.tabIndex=0; card.setAttribute('role','button');
+    card.setAttribute('aria-label', `View details for ${p.name}, ${p.area}${p.fav?', one of our favourites':''}`);
     const img = p.img ? `<img src="${p.img}" alt="${p.name}" loading="lazy" decoding="async">` : ``;
     card.innerHTML=`
       <div class="c-img" style="--g:${gradFor(p.name)}">${img}</div>
-      <span class="c-cat"><span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
+      <span class="c-cat">${p.fav?`<span class="c-fav" aria-hidden="true">&#9733;</span>`:``}<span class="cat-dot" style="--dot:${CATS[p.category].color}"></span>${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
       <h4>${p.name}</h4>
       <p class="c-desc">${p.story}</p>
       <span class="c-more link-u">Discover more <span>&rarr;</span></span>`;
@@ -1600,12 +1707,17 @@ function renderCards(cat){
 
 function popupHtml(p){
   const q=encodeURIComponent(`${p.name} Yogyakarta`);
-  return `<div class="pop">
+  /* p.url is the place's own Google Maps link, so directions are exact even where the
+     pin was placed from a street address. Friends' recommendations never carry one and
+     fall back to a name search. */
+  const href = p.url || `https://www.google.com/maps/search/?api=1&query=${q}`;
+  return `<div class="pop${p.category==='wedding'?' pop-wedding':''}">
     <span class="eyebrow">${CATS[p.category].label} &nbsp;·&nbsp; ${p.area}</span>
     <h3>${p.name}</h3>
+    ${p.fav?`<span class="pop-fav"><span aria-hidden="true">&#9733;</span> One of our favourites</span>`:``}
     <p class="pop-story">${p.story}</p>
     <div class="pop-tip"><span class="eyebrow">Our tip</span><div class="txt">${p.note}</div></div>
-    <a class="pop-link link-u" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">Get directions <span>&rarr;</span></a>
+    <a class="pop-link link-u" target="_blank" rel="noopener" href="${href}">Get directions <span>&rarr;</span></a>
   </div>`;
 }
 
@@ -1653,17 +1765,34 @@ function initMap(){
   });
 }
 
+/* The wedding places are the fixed points of the guide, so they stay pinned under
+   every filter — the venue is never more than a glance away, whatever you browse. */
+const weddingPlaces = () => ALL.map((p,i)=>({...p,_i:i})).filter(p=>p.category==='wedding');
+
+function legendFor(cat, n){
+  if(cat==='all') return `${n} favourite spots across the city`;
+  if(cat==='wedding') return `Where the day happens`;
+  if(cat==='favourites') return `${n} places we go back to, again and again`;
+  return `${n} ${CATS[cat].label} spots we love`;
+}
+
 function renderMarkers(cat){
   const list=placesFor(cat);
-  legendEl.textContent = cat==='all' ? `${list.length} favourite spots across the city` : `${list.length} ${CATS[cat].label} spots we love`;
+  legendEl.textContent = legendFor(cat, list.length);
   if(!map) return;   /* map loads lazily; initMap() calls renderMarkers(active) itself once it's ready */
   markers.forEach(m=>m.marker.remove()); markers=[];
-  list.filter(p=>p.coords).forEach(p=>{
+  const shown=new Set(list.map(p=>p._i));
+  const pinned=list.concat(weddingPlaces().filter(p=>!shown.has(p._i)));
+  pinned.filter(p=>p.coords).forEach(p=>{
+    const wed = p.category==='wedding';
     const el=document.createElement('div');
-    el.className='pin';
-    el.tabIndex=0; el.setAttribute('role','button'); el.setAttribute('aria-label', `Show ${p.name} on the map`);
+    el.className = wed ? 'pin pin-wedding' : 'pin';
+    el.tabIndex=0; el.setAttribute('role','button');
+    el.setAttribute('aria-label', wed ? `Show ${p.name}, a wedding venue, on the map` : `Show ${p.name} on the map`);
     el.style.setProperty('--pin-color', CATS[p.category].color);
-    el.innerHTML=`<div class="pill">${p.name}</div>`;
+    el.innerHTML = wed
+      ? `<div class="pill pill-wedding"><span class="pin-rings" aria-hidden="true">${CATS.wedding.icon}</span>${p.name}</div>`
+      : `<div class="pill">${p.fav?`<span class="pin-star" aria-hidden="true">&#9733;</span>`:``}${p.name}</div>`;
     el.addEventListener('click', ev=>{ ev.stopPropagation(); focusPlace(p._i,false); });
     el.addEventListener('keydown', ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); ev.stopPropagation(); focusPlace(p._i,false); } });
     el.addEventListener('mouseenter', ()=>cardFor(p._i)?.classList.add('active'));
@@ -1671,6 +1800,8 @@ function renderMarkers(cat){
     const marker=new maplibregl.Marker({element:el, anchor:'center'}).setLngLat(lngLat(p)).addTo(map);
     markers.push({idx:p._i, el, marker});
   });
+  /* frame the chosen category only — the always-on wedding pins must not drag the
+     viewport 15km north every time you filter for coffee in the centre */
   const locs=list.filter(p=>p.coords);
   if(locs.length){
     const b=new maplibregl.LngLatBounds();
@@ -1763,7 +1894,7 @@ function selectCategory(cat){
   active=cat;
   [...switchEl.querySelectorAll('.tab')].forEach(b=>b.setAttribute('aria-selected', b.dataset.cat===cat?'true':'false'));
   moveHighlight();
-  railTitle.textContent=CATS[cat].label;
+  railTitle.textContent=CATS[cat].rail || CATS[cat].label;
   deselect();
   cardsEl.style.opacity=0;
   setTimeout(()=>{ renderCards(cat); cardsEl.scrollTo({left:0}); cardsEl.style.transition='opacity .5s'; cardsEl.style.opacity=1; },180);
