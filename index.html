@@ -639,7 +639,8 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 /* the place field is a combobox: type, and OpenStreetMap answers with real pins */
 .rec-combo{position:relative}
 .rec-suggest{position:absolute; z-index:40; top:calc(100% - 1px); left:0; right:0; margin:0; padding:0; list-style:none;
-  background:var(--white); border:1px solid var(--ink); max-height:264px; overflow-y:auto; box-shadow:0 18px 40px rgba(40,36,30,.16)}
+  background:var(--white); border:1px solid var(--ink); max-height:330px; overflow-y:auto; overscroll-behavior:contain;
+  box-shadow:0 18px 40px rgba(40,36,30,.16)}
 .rec-suggest li{padding:11px 16px; cursor:pointer; border-top:1px solid var(--line)}
 .rec-suggest li:first-child{border-top:none}
 .rec-suggest li[aria-selected="true"],.rec-suggest li:hover{background:var(--surface-2)}
@@ -659,6 +660,23 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
 .rec-mini{margin-top:12px}
 .rec-mini-map{height:230px; border:1px solid var(--line-2); background:var(--surface-2)}
 .rec-mini-hint{margin-top:8px; font-family:var(--sans); font-weight:300; font-size:12px; color:var(--muted)}
+/* the photo: the file input itself is hidden and its label does the work, so the
+   control looks like the rest of the form rather than like a browser's own button */
+.rec-photo{display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px}
+.rec-photo input[type=file]{position:absolute; width:1px; height:1px; opacity:0; pointer-events:none}
+.rec-photo-btn{display:inline-flex; align-items:center; min-height:44px; padding:12px 22px; cursor:pointer;
+  font-family:var(--sans); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line-2); transition:border-color .3s, background .3s}
+.rec-photo-btn:hover{border-color:var(--ink); background:var(--surface-2)}
+.rec-photo input[type=file]:focus-visible + .rec-photo-btn{outline:1px solid var(--ink); outline-offset:2px}
+.rec-photo-note{font-family:var(--sans); font-weight:300; font-size:12.5px; line-height:1.6; color:var(--muted); flex:1 1 220px}
+.rec-photo-note.working{color:var(--ink-2)}
+.rec-photo-preview{display:flex; align-items:flex-start; gap:14px; margin-top:14px}
+.rec-photo-preview img{width:132px; height:99px; object-fit:cover; border:1px solid var(--line-2); display:block}
+.rec-photo-drop{font-family:var(--sans); font-size:12.5px; font-weight:300; color:var(--ink); background:none; border:none;
+  padding:0; cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line-2)}
+.rec-photo-drop:hover{text-decoration-color:var(--ink)}
+
 /* a field only a robot would fill in — off-screen rather than display:none, which
    the better-written bots know to skip */
 .rec-hp{position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden}
@@ -848,6 +866,18 @@ p{margin:0} a{color:inherit} button{font-family:inherit} img{max-width:100%; dis
           <label for="rec-link">Google Maps link <span class="rec-opt">OPTIONAL</span></label>
           <input id="rec-link" name="link" type="url" inputmode="url" autocomplete="off"
                  placeholder="Paste one and the directions button goes straight there" />
+        </div>
+        <div class="rec-field" id="f-photo">
+          <label for="rec-photo">A photo <span class="rec-opt">OPTIONAL</span></label>
+          <div class="rec-photo">
+            <input id="rec-photo" name="photo" type="file" accept="image/*" />
+            <label class="rec-photo-btn" for="rec-photo">Choose a photo</label>
+            <span class="rec-photo-note" id="rec-photo-note">Yours, ideally — the plate, the room, whatever made you remember it.</span>
+          </div>
+          <div class="rec-photo-preview" id="rec-photo-preview" hidden>
+            <img id="rec-photo-img" alt="The photo you chose" />
+            <button type="button" class="rec-photo-drop" id="rec-photo-drop">Remove</button>
+          </div>
         </div>
         <div class="rec-hp" aria-hidden="true">
           <label for="rec-web">Leave this field empty</label>
@@ -1815,6 +1845,7 @@ const recAsPlace = r => {
   return {
     category:'friends', name:esc(r.place), area: by ? `by ${by}` : 'by a friend',
     coords:r.coords || null, blurb:why, story:why, url:safeUrl(r.url),
+    img:safeUrl(r.image),
     note:`A tip from ${by || 'a friend'} — terima kasih!`
   };
 };
@@ -2333,7 +2364,7 @@ function searchPlaces(q){
      the search means every slot returned is a slot in Yogyakarta. */
   const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}`+
             `&bbox=${JOGJA.min[1]},${JOGJA.min[0]},${JOGJA.max[1]},${JOGJA.max[0]}`+
-            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&limit=8&lang=en`;
+            `&lat=${JOGJA.lat}&lon=${JOGJA.lon}&limit=25&lang=en`;
   fetch(url,{signal:recAbort.signal})
     .then(r=>r.ok?r.json():null)
     .then(data=>{
@@ -2345,7 +2376,7 @@ function searchPlaces(q){
           coords:[f.geometry.coordinates[1], f.geometry.coordinates[0]]
         }))
         .filter(h=>h.name && inJogja(h.coords[0], h.coords[1]))
-        .slice(0,6);
+        .slice(0,15);   /* the list scrolls, so show what came back rather than the first handful */
       recCursor=-1;
       if(!recHits.length){
         /* No shame in this — OSM simply doesn't know every warung. Say so on the
@@ -2380,6 +2411,86 @@ recPlaceInput.addEventListener('keydown', e=>{
   else if(e.key==='Escape'){ closeSuggest(); }
 });
 recPlaceInput.addEventListener('blur', ()=>setTimeout(closeSuggest, 120));
+
+/* ---- the photo ----------------------------------------------------------
+   A phone camera writes several megabytes, and none of that survives being
+   shown in a 4:3 card, so the picture is redrawn here at 1200px before it ever
+   leaves the device: kinder to a guest on hotel wifi, and it keeps the request
+   inside what Apps Script will accept. createImageBitmap is asked first because
+   it is the one path that reliably honours the EXIF rotation a phone writes —
+   otherwise half the photos arrive on their side. ------------------------- */
+const recPhotoInput=document.getElementById('rec-photo');
+const recPhotoNote=document.getElementById('rec-photo-note');
+const recPhotoPreview=document.getElementById('rec-photo-preview');
+const recPhotoImg=document.getElementById('rec-photo-img');
+const PHOTO_EDGE=1200, PHOTO_QUALITY=.82, PHOTO_CEILING=2.6e6;
+
+let recPhoto=null;   /* a bare base64 JPEG, no data: prefix — the sheet gets the file, not this */
+
+function drawableFrom(file){
+  if(window.createImageBitmap){
+    return createImageBitmap(file, {imageOrientation:'from-image'}).catch(()=>drawableFromImg(file));
+  }
+  return drawableFromImg(file);
+}
+function drawableFromImg(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+    img.src=url;
+  });
+}
+
+async function shrinkPhoto(file){
+  const src=await drawableFrom(file);
+  const w0=src.width||src.naturalWidth, h0=src.height||src.naturalHeight;
+  if(!w0||!h0) throw new Error('unreadable');
+  const scale=Math.min(1, PHOTO_EDGE/Math.max(w0,h0));
+  const w=Math.max(1,Math.round(w0*scale)), h=Math.max(1,Math.round(h0*scale));
+  const canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  canvas.getContext('2d').drawImage(src,0,0,w,h);
+  if(src.close) src.close();
+  let out=canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+  /* a photograph of a menu board can still be enormous at this size — lean on it
+     again rather than refuse a guest their picture */
+  if(out.length>PHOTO_CEILING) out=canvas.toDataURL('image/jpeg', .6);
+  if(out.length>PHOTO_CEILING) out=canvas.toDataURL('image/jpeg', .45);
+  return out;
+}
+
+function clearPhoto(){
+  recPhoto=null;
+  recPhotoInput.value='';
+  recPhotoPreview.hidden=true;
+  recPhotoImg.removeAttribute('src');
+  recPhotoNote.classList.remove('working');
+  recPhotoNote.textContent='Yours, ideally — the plate, the room, whatever made you remember it.';
+}
+
+recPhotoInput.addEventListener('change', async ()=>{
+  const file=recPhotoInput.files && recPhotoInput.files[0];
+  if(!file) return clearPhoto();
+  if(!/^image\//.test(file.type)){
+    clearPhoto();
+    recPhotoNote.textContent='That doesn’t look like a picture — try a photo instead.';
+    return;
+  }
+  recPhotoNote.classList.add('working');
+  recPhotoNote.textContent='Getting it ready…';
+  try{
+    const dataUrl=await shrinkPhoto(file);
+    recPhoto=dataUrl.split(',')[1];
+    recPhotoImg.src=dataUrl;
+    recPhotoPreview.hidden=false;
+    recPhotoNote.textContent=`Ready — about ${Math.max(1,Math.round(recPhoto.length*0.75/1024))}KB once it’s sent.`;
+  }catch(e){
+    clearPhoto();
+    recPhotoNote.textContent='That picture couldn’t be read — try another?';
+  }
+});
+document.getElementById('rec-photo-drop').addEventListener('click', clearPhoto);
 
 /* a pasted link can pin the place on its own — the commonest way out when the
    dropdown has nothing, since the guest has usually just found it on their phone */
@@ -2453,7 +2564,7 @@ function loadSharedRecs(){
       const first=!sharedSig;
       sharedSig=sig;
       SHARED=rows.filter(r=>r&&r.place).map(r=>({
-        id:r.id, by:r.by, place:r.place, why:r.why, url:r.url||'',
+        id:r.id, by:r.by, place:r.place, why:r.why, url:r.url||'', image:r.image||'',
         coords:(typeof r.lat==='number'&&typeof r.lng==='number'&&inJogja(r.lat,r.lng))?[r.lat,r.lng]:null
       }));
       refreshAll();
@@ -2533,6 +2644,10 @@ recForm.addEventListener('submit', e=>{
   const url=safeUrl(recLinkInput.value.trim());
   const hp=document.getElementById('rec-web').value;
   const rec={ t:Date.now(), by, place, why, url, coords:recCoords, hp };
+  /* the photo rides with the POST but is never kept on the device: a few hundred
+     KB of base64 per tip would fill localStorage in a handful of recommendations,
+     and the copy that matters is the one coming back from Drive */
+  const outgoing={...rec, photo:recPhoto||'' };
   store.recs=store.recs.concat([rec]);
   refreshAll();
   updateTabCounts();
@@ -2546,7 +2661,7 @@ recForm.addEventListener('submit', e=>{
 
   if(REC_ENDPOINT){
     recStatus.innerHTML=`Terima kasih, ${esc(by)}! Sending it over…`;
-    postRec(rec).then(ok=>{
+    postRec(outgoing).then(ok=>{
       recStatus.innerHTML = ok
         ? `Terima kasih, ${esc(by)}! ${pinned} Every other guest can see it now too.`
         : `Terima kasih, ${esc(by)}! ${pinned}<br>`+
@@ -2559,6 +2674,7 @@ recForm.addEventListener('submit', e=>{
   }
 
   recForm.reset();
+  clearPhoto();
   setRecCoords(null,'','');
   closeSuggest();
   recMini.hidden=true;

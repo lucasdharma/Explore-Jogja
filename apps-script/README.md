@@ -62,6 +62,7 @@ the next time anyone opens the page. Clear it and it's back.
 | Why | Their words, shown on the card and in the popup. |
 | Link | Their Google Maps link, if they pasted one. Drives *Get directions*. |
 | Lat / Lng | Where they pinned it. |
+| Image | Their photo, saved to your Drive. Paste any image URL here yourself to add or replace one. |
 
 Every cell is editable and guests see whatever's in it, so you can fix a
 spelling, trim a rambling *Why*, or tidy a name at any point — the change shows
@@ -77,6 +78,30 @@ row — see the note on clearing them below.
 pin. The tip still shows as a card; it just has no marker. To place it: find the
 spot on [Google Maps](https://maps.google.com), right-click it, click the
 coordinates to copy them, and paste them into Lat and Lng.
+
+## Photos
+
+Guests may attach one, and it's optional — most tips won't have it. The picture
+is shrunk to 1200px in their browser before it's sent, so it arrives a few
+hundred kilobytes rather than several megabytes, and lands in a Drive folder
+called **Our Yogyakarta — guest photos**, made the first time anyone sends one.
+The file is shared as *anyone with the link can view*, which is what lets the
+guide draw it for guests who are signed into nothing.
+
+The **Image** column holds the resulting URL, and you can edit it like any other
+cell — paste in a different image address to replace an unflattering photo, or
+add one to a tip that arrived without. Empty is fine: those cards fall back to
+the woven gradient, exactly as they did before.
+
+To remove a photo, clear the cell. Deleting the file from Drive works too, and
+the card falls back to the gradient — though the row will keep a URL that no
+longer resolves, so clearing the cell is tidier.
+
+One caveat worth knowing: the URL uses Drive's `thumbnail` endpoint, which is
+what reliably returns image bytes to an `<img>` tag, but Google has changed how
+Drive serves images before and could again. If photos ever stop appearing, that's
+the first thing to suspect — and moving to a dedicated image host would mean
+changing one line in `savePhoto_`.
 
 ## Testing it, and clearing up afterwards
 

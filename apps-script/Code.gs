@@ -10,11 +10,17 @@
  * Setup lives in README.md next door.
  *
  * Columns, in order — the header row is written for you on first run:
- *   A Received   B Hidden   C Id   D Name   E Place   F Why   G Link   H Lat   I Lng
+ *   A Received  B Hidden  C Id  D Name  E Place  F Why  G Link  H Lat  I Lng  J Image
  */
 
 var SHEET_NAME = 'Recommendations';
-var HEADERS = ['Received','Hidden','Id','Name','Place','Why','Link','Lat','Lng'];
+var HEADERS = ['Received','Hidden','Id','Name','Place','Why','Link','Lat','Lng','Image'];
+
+/* Photos guests send land here, in your Drive. The folder is made on the first
+   photo and reused after that; delete a file and that tip simply loses its
+   picture, which the guide draws as the woven gradient instead. */
+var PHOTO_FOLDER = 'Our Yogyakarta — guest photos';
+var PHOTO_MAX_BYTES = 4 * 1024 * 1024;
 
 /* Yogyakarta and its ring of regencies — the same box the guide checks against,
    so a pin can never arrive from the other side of the world. */
@@ -27,8 +33,53 @@ function sheet_() {
     sh = ss.insertSheet(SHEET_NAME);
     sh.appendRow(HEADERS);
     sh.setFrozenRows(1);
+    return sh;
+  }
+  /* A sheet made before a column existed would otherwise keep an old header over
+     new data — so bring the row up to date rather than making you type it in. */
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(HEADERS);
+    sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < HEADERS.length) {
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
   return sh;
+}
+
+/* The folder guests' photos go into, made once and found by name after that. */
+function photoFolder_() {
+  var found = DriveApp.getFoldersByName(PHOTO_FOLDER);
+  return found.hasNext() ? found.next() : DriveApp.createFolder(PHOTO_FOLDER);
+}
+
+/**
+ * Save a guest's photo to Drive and hand back a URL the guide can draw.
+ *
+ * Returns '' for anything that isn't a plausible image, rather than throwing:
+ * a picture that won't save should cost a guest their photo, never their
+ * recommendation.
+ */
+function savePhoto_(base64, type, place) {
+  try {
+    if (!base64) return '';
+    if (base64.length * 0.75 > PHOTO_MAX_BYTES) return '';
+    if (type && String(type).indexOf('image/') !== 0) return '';
+
+    var name = (String(place || 'a place').replace(/[^\w \-]/g, '').slice(0, 60) || 'a place') +
+               ' — ' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyy-MM-dd HHmmss') + '.jpg';
+    var blob = Utilities.newBlob(Utilities.base64Decode(base64), type || 'image/jpeg', name);
+    var file = photoFolder_().createFile(blob);
+
+    /* the guide is opened by guests who are signed into nothing, so the file has
+       to be readable by way of its link alone */
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    /* Drive's /thumbnail endpoint is the one that answers with image bytes an
+       <img> can use; the /uc?export=view form now often replies with a page. */
+    return 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1600';
+  } catch (err) {
+    return '';
+  }
 }
 
 function json_(data) {
@@ -64,6 +115,8 @@ function doGet() {
                  lat >= BOUNDS.minLat && lat <= BOUNDS.maxLat &&
                  lng >= BOUNDS.minLng && lng <= BOUNDS.maxLng;
 
+    var image = String(r[9] || '').trim();
+
     out.push({
       id:    String(r[2]),
       by:    String(r[3]),
@@ -71,7 +124,8 @@ function doGet() {
       why:   String(r[5]),
       url:   String(r[6]),
       lat:   pinned ? lat : null,
-      lng:   pinned ? lng : null
+      lng:   pinned ? lng : null,
+      image: /^https?:\/\//i.test(image) ? image : ''
     });
   });
 
@@ -111,10 +165,15 @@ function doPost(e) {
           ln >= BOUNDS.minLng && ln <= BOUNDS.maxLng) { lat = la; lng = ln; }
     }
 
+    /* Written to Drive before the lock is taken: saving a photo is far and away
+       the slowest thing here, and holding every other guest behind it would turn
+       one big picture into a queue. */
+    var image = savePhoto_(body.photo, body.photoType, place);
+
     /* one writer at a time, so two guests submitting together can't land on
        the same row */
     var lock = LockService.getScriptLock();
-    lock.waitLock(20000);
+    lock.waitLock(30000);
     try {
       sheet_().appendRow([
         new Date(),
@@ -125,7 +184,8 @@ function doPost(e) {
         str_(body.why, 2000),
         link,
         lat,
-        lng
+        lng,
+        image
       ]);
     } finally {
       lock.releaseLock();
